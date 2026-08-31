@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Essencialmente | Painel</title>
+<link rel="icon" type="image/png" href="logo.png">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --forest:#2d4327; --sage:#7a9b5c; --teal-text:#2f4f4a;
+    --sage-light:#eef1e7; --cream:#faf8f3; --ink:#2b2b26;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{ font-family:'Inter', sans-serif; background:var(--cream); color:var(--ink); }
+  header{ display:flex; align-items:center; justify-content:space-between; padding:20px 5vw; border-bottom:1px solid #e7e3d9; }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand img{ width:32px; height:32px; border-radius:50%; }
+  .brand span{ font-family:'Fraunces', serif; font-size:1.2rem; color:var(--teal-text); }
+  #btn-sair{ background:none; border:1px solid var(--forest); color:var(--forest); padding:8px 16px; border-radius:6px; cursor:pointer; display:none; }
+
+  #login-box{ max-width:360px; margin:80px auto; padding:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; }
+  #login-box h2{ font-family:'Fraunces', serif; color:var(--forest); margin-bottom:20px; font-size:1.4rem; }
+  #login-box input{ width:100%; padding:11px; margin-bottom:12px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem; }
+  #login-box button{ width:100%; padding:12px; background:var(--forest); color:#fff; border:none; border-radius:6px; font-size:0.95rem; cursor:pointer; }
+  #login-erro{ color:#b3452c; font-size:0.85rem; margin-top:10px; display:none; }
+
+  main{ display:none; padding:4vw 5vw; }
+  main.ativo{ display:block; }
+  .resumo{ font-size:0.9rem; color:#5c5c52; margin-bottom:24px; }
+  table{ width:100%; border-collapse:collapse; background:#fff; }
+  th, td{ text-align:left; padding:12px 14px; border-bottom:1px solid #eee; font-size:0.9rem; }
+  th{ background:var(--sage-light); color:var(--teal-text); font-weight:600; }
+  .estado{ padding:4px 10px; border-radius:20px; font-size:0.78rem; }
+  .estado-confirmada{ background:#e2ecdb; color:#3c5a2f; }
+  .estado-cancelada{ background:#f5dede; color:#8a3a3a; }
+  .estado-realizada{ background:#e0e6f0; color:#3a4a6b; }
+  #vazio{ color:#888; padding:30px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <img src="logo.png" alt="Essencialmente">
+    <span>Painel — Essencial<em style="font-style:normal;">Mente</em></span>
+  </div>
+  <button id="btn-sair">Sair</button>
+</header>
+
+<div id="login-box">
+  <h2>Entrar</h2>
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Palavra-passe">
+  <button id="btn-entrar">Entrar</button>
+  <p id="login-erro">Email ou palavra-passe incorretos.</p>
+</div>
+
+<main id="painel">
+  <p class="resumo" id="resumo-utilizador"></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Data</th>
+        <th>Hora</th>
+        <th>Cliente</th>
+        <th>Psicólogo</th>
+        <th>Tipo</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody id="lista-consultas"></tbody>
+  </table>
+  <p id="vazio" style="display:none;">Ainda não há consultas marcadas.</p>
+</main>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { getFirestore, collection, getDocs, doc, getDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBi-arHgDBIGpCCu50_yD3Yxz0reJtwuTs",
+    authDomain: "essencialmente-psicologia.firebaseapp.com",
+    projectId: "essencialmente-psicologia",
+    storageBucket: "essencialmente-psicologia.firebasestorage.app",
+    messagingSenderId: "908412673464",
+    appId: "1:908412673464:web:d838e6b1e8cc7a07ff434d"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+
+  const loginBox = document.getElementById("login-box");
+  const painel = document.getElementById("painel");
+  const btnSair = document.getElementById("btn-sair");
+  const loginErro = document.getElementById("login-erro");
+
+  document.getElementById("btn-entrar").addEventListener("click", async () => {
+    const email = document.getElementById("email").value.trim();
+    const pass = document.getElementById("password").value;
+    loginErro.style.display = "none";
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (err) {
+      console.error(err);
+      loginErro.style.display = "block";
+    }
+  });
+
+  btnSair.addEventListener("click", () => signOut(auth));
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      loginBox.style.display = "block";
+      painel.classList.remove("ativo");
+      btnSair.style.display = "none";
+      return;
+    }
+
+    // Descobrir o papel (role) do utilizador — o ID do documento em "psicologos"
+    // deve ser igual ao UID da conta de autenticação
+    const perfilRef = doc(db, "psicologos", user.uid);
+    const perfilSnap = await getDoc(perfilRef);
+
+    if (!perfilSnap.exists()) {
+      loginErro.textContent = "Esta conta ainda não está associada a nenhum perfil de psicólogo. Contacta o admin.";
+      loginErro.style.display = "block";
+      await signOut(auth);
+      return;
+    }
+
+    const perfil = perfilSnap.data();
+    const role = perfil.role || "psicologo";
+
+    loginBox.style.display = "none";
+    painel.classList.add("ativo");
+    btnSair.style.display = "inline-block";
+
+    document.getElementById("resumo-utilizador").textContent =
+      role === "admin"
+        ? `Sessão de administrador (${perfil.nome || user.email}) — a ver todas as consultas.`
+        : `Sessão de ${perfil.nome || user.email} — a ver as tuas consultas.`;
+
+    carregarConsultas(role, user.uid);
+  });
+
+  async function carregarConsultas(role, psicologoId) {
+    const corpo = document.getElementById("lista-consultas");
+    const vazio = document.getElementById("vazio");
+    corpo.innerHTML = "";
+
+    let consultasQuery;
+    if (role === "admin") {
+      consultasQuery = query(collection(db, "consultas"), orderBy("data", "desc"));
+    } else {
+      consultasQuery = query(collection(db, "consultas"), where("psicologoId", "==", psicologoId), orderBy("data", "desc"));
+    }
+
+    try {
+      const snap = await getDocs(consultasQuery);
+      if (snap.empty) {
+        vazio.style.display = "block";
+        return;
+      }
+      snap.forEach(doc => {
+        const c = doc.data();
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${c.data || "-"}</td>
+          <td>${c.hora || "-"}</td>
+          <td>${c.clienteNome || "-"}</td>
+          <td>${c.psicologoNome || "-"}</td>
+          <td>${c.tipo || "-"}</td>
+          <td><span class="estado estado-${c.estado || "confirmada"}">${c.estado || "confirmada"}</span></td>
+        `;
+        corpo.appendChild(tr);
+      });
+    } catch (err) {
+      console.error("Erro ao carregar consultas:", err);
+      vazio.textContent = "Não foi possível carregar as consultas.";
+      vazio.style.display = "block";
+    }
+  }
+</script>
+
+</body>
+</html>
