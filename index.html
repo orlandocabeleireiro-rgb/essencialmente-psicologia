@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Essencialmente | Consultas de Psicologia Online</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --forest:#2d4327;
+    --sage:#7a9b5c;
+    --teal-text:#2f4f4a;
+    --sage-text:#7a9b8a;
+    --sage-light:#eef1e7;
+    --cream:#faf8f3;
+    --ink:#2b2b26;
+    --sage-deep:#2d4327;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Inter', sans-serif;
+    background:var(--cream);
+    color:var(--ink);
+    line-height:1.6;
+  }
+  header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:24px 6vw;
+    background:var(--cream);
+  }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand span{
+    font-family:'Fraunces', serif;
+    font-size:1.4rem;
+    font-weight:500;
+    color:var(--teal-text);
+    letter-spacing:0.01em;
+  }
+  nav a{
+    color:var(--ink);
+    text-decoration:none;
+    margin-left:28px;
+    font-size:0.95rem;
+  }
+  .cta-btn{
+    background:var(--sage-deep);
+    color:var(--cream);
+    padding:10px 22px;
+    border-radius:6px;
+    text-decoration:none;
+    font-size:0.95rem;
+  }
+  .hero{
+    display:grid;
+    grid-template-columns:1.1fr 0.9fr;
+    align-items:center;
+    gap:40px;
+    padding:6vw;
+  }
+  .hero h1{
+    font-family:'Fraunces', serif;
+    font-weight:500;
+    font-size:clamp(2.2rem, 4vw, 3.4rem);
+    color:var(--sage-deep);
+    max-width:14ch;
+    line-height:1.15;
+  }
+  .hero p{
+    margin-top:20px;
+    max-width:42ch;
+    color:#4a4a42;
+    font-size:1.05rem;
+  }
+  .hero-actions{ margin-top:32px; display:flex; gap:16px; }
+  .hero-actions a{
+    text-decoration:none;
+    padding:13px 26px;
+    border-radius:6px;
+    font-size:0.95rem;
+  }
+  .primary{ background:var(--sage-deep); color:var(--cream); }
+  .secondary{ border:1px solid var(--sage-deep); color:var(--sage-deep); }
+  .hero-visual{
+    background:var(--sage-light);
+    border-radius:16px;
+    aspect-ratio:1/1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  section.tipos{ padding:4vw 6vw; }
+  section.tipos h2{
+    font-family:'Fraunces', serif;
+    font-weight:500;
+    font-size:1.8rem;
+    color:var(--sage-deep);
+    margin-bottom:28px;
+  }
+  .cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+    gap:20px;
+  }
+  .card{
+    background:#fff;
+    border:1px solid #e7e3d9;
+    border-radius:10px;
+    padding:26px;
+  }
+  .card h3{ font-size:1.05rem; margin-bottom:8px; color:var(--sage-deep); }
+  .card p{ font-size:0.9rem; color:#5c5c52; }
+  footer{
+    padding:5vw 6vw;
+    background:var(--sage-deep);
+    color:var(--sage-light);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:16px;
+    margin-top:4vw;
+  }
+  footer a{ color:var(--sage-light); }
+  @media (max-width:760px){
+    .hero{ grid-template-columns:1fr; }
+    header{ flex-wrap:wrap; gap:12px; }
+    nav a{ margin-left:0; margin-right:20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <img src="assets/logo.png" alt="Essencialmente" width="40" height="40" style="border-radius:50%;">
+    <span>Essencial<em style="font-style:normal; color:var(--sage-text);">Mente</em></span>
+  </div>
+  <nav>
+    <a href="#tipos">Consultas</a>
+    <a href="#sobre">Sobre</a>
+    <a href="#marcar" class="cta-btn">Marcar consulta</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <div>
+    <h1>Espaço para pensar, sentir e crescer</h1>
+    <p>Consultas de psicologia online, com uma equipa de psicólogos disponível para te acompanhar onde quer que estejas.</p>
+    <div class="hero-actions">
+      <a href="#marcar" class="primary">Marcar consulta</a>
+      <a href="#tipos" class="secondary">Ver tipos de consulta</a>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <img src="assets/logo.png" alt="Essencialmente" style="width:75%; max-width:280px; border-radius:50%;">
+  </div>
+</section>
+
+<section class="tipos" id="tipos">
+  <h2>Tipos de consulta</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>Primeira consulta</h3>
+      <p>Avaliação inicial para perceber o que te traz até aqui e desenhar o plano de acompanhamento.</p>
+    </div>
+    <div class="card">
+      <h3>Consulta de acompanhamento</h3>
+      <p>Sessões regulares de continuidade do processo terapêutico.</p>
+    </div>
+    <div class="card">
+      <h3>Consulta de casal</h3>
+      <p>Espaço partilhado para trabalhar a relação com o apoio de um psicólogo.</p>
+    </div>
+  </div>
+</section>
+
+<section class="tipos" id="sobre">
+  <h2>A nossa equipa</h2>
+  <div class="cards" id="lista-psicologos">
+    <!-- Preenchido dinamicamente a partir da coleção "psicologos" no Firestore -->
+  </div>
+</section>
+
+<footer id="marcar">
+  <span>Essencialmente — Consultas de psicologia online</span>
+  <div>
+    <a href="https://www.instagram.com/essencialmente.psi" target="_blank">Instagram</a>
+  </div>
+</footer>
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getAuth } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBi-arHgDBIGpCCu50_yD3Yxz0reJtwuTs",
+    authDomain: "essencialmente-psicologia.firebaseapp.com",
+    projectId: "essencialmente-psicologia",
+    storageBucket: "essencialmente-psicologia.firebasestorage.app",
+    messagingSenderId: "908412673464",
+    appId: "1:908412673464:web:d838e6b1e8cc7a07ff434d"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDocs ? getFirestore(app) : null;
+  const auth = getAuth(app);
+  window.db = db;
+  window.auth = auth;
+
+  // Carrega os psicólogos da coleção "psicologos" e mostra-os na secção "A nossa equipa"
+  async function carregarPsicologos() {
+    const container = document.getElementById("lista-psicologos");
+    try {
+      const snap = await getDocs(collection(db, "psicologos"));
+      if (snap.empty) {
+        container.innerHTML = '<p style="color:#888;">Ainda sem psicólogos adicionados.</p>';
+        return;
+      }
+      container.innerHTML = "";
+      snap.forEach(doc => {
+        const p = doc.data();
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `<h3>${p.nome || "Sem nome"}</h3><p>${p.especialidade || ""}</p>`;
+        container.appendChild(card);
+      });
+    } catch (err) {
+      console.error("Erro ao carregar psicólogos:", err);
+      container.innerHTML = '<p style="color:#888;">Não foi possível carregar a equipa.</p>';
+    }
+  }
+  carregarPsicologos();
+</script>
+
+</body>
+</html>
