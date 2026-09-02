@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Essencialmente | Painel</title>
+<link rel="icon" type="image/png" href="logo.png">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --forest:#2d4327; --sage:#7a9b5c; --teal-text:#2f4f4a;
+    --sage-light:#eef1e7; --cream:#faf8f3; --ink:#2b2b26;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{ font-family:'Inter', sans-serif; background:var(--cream); color:var(--ink); }
+  header{ display:flex; align-items:center; justify-content:space-between; padding:20px 5vw; border-bottom:1px solid #e7e3d9; }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand img{ width:32px; height:32px; border-radius:50%; }
+  .brand span{ font-family:'Fraunces', serif; font-size:1.2rem; color:var(--teal-text); }
+  #btn-sair{ background:none; border:1px solid var(--forest); color:var(--forest); padding:8px 16px; border-radius:6px; cursor:pointer; display:none; }
+
+  #login-box{ max-width:360px; margin:80px auto; padding:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; }
+  #login-box h2{ font-family:'Fraunces', serif; color:var(--forest); margin-bottom:20px; font-size:1.4rem; }
+  #login-box input{ width:100%; padding:11px; margin-bottom:12px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem; }
+  #login-box button{ width:100%; padding:12px; background:var(--forest); color:#fff; border:none; border-radius:6px; font-size:0.95rem; cursor:pointer; }
+  #login-erro{ color:#b3452c; font-size:0.85rem; margin-top:10px; display:none; }
+
+  main{ display:none; padding:4vw 5vw; }
+  main.ativo{ display:block; }
+  .resumo{ font-size:0.9rem; color:#5c5c52; margin-bottom:24px; }
+  table{ width:100%; border-collapse:collapse; background:#fff; }
+  th, td{ text-align:left; padding:12px 14px; border-bottom:1px solid #eee; font-size:0.9rem; }
+  th{ background:var(--sage-light); color:var(--teal-text); font-weight:600; }
+  .estado{ padding:4px 10px; border-radius:20px; font-size:0.78rem; }
+  .estado-confirmada{ background:#e2ecdb; color:#3c5a2f; }
+  .estado-cancelada{ background:#f5dede; color:#8a3a3a; }
+  .estado-realizada{ background:#e0e6f0; color:#3a4a6b; }
+  #vazio{ color:#888; padding:30px 0; }
+  tr.linha-consulta{ cursor:pointer; }
+  tr.linha-consulta:hover{ background:var(--sage-light); }
+  .badge-novo{ display:inline-block; width:8px; height:8px; border-radius:50%; background:#c98a5e; margin-right:8px; }
+
+  .modal-fundo{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:50; align-items:center; justify-content:center; padding:20px; }
+  .modal-fundo.ativo{ display:flex; }
+  .modal-caixa{ background:#fff; border-radius:10px; padding:28px; max-width:480px; width:100%; max-height:85vh; overflow-y:auto; }
+  .modal-caixa h3{ font-family:'Fraunces', serif; color:var(--forest); margin-bottom:18px; font-size:1.2rem; }
+  .modal-linha{ margin-bottom:10px; font-size:0.92rem; }
+  .modal-linha b{ color:var(--teal-text); }
+  .modal-caixa textarea{ width:100%; min-height:110px; padding:10px; border:1px solid #ccc; border-radius:6px; font-family:inherit; font-size:0.9rem; margin-top:6px; resize:vertical; }
+  .modal-botoes{ display:flex; gap:10px; margin-top:16px; }
+  .modal-botoes button{ padding:10px 18px; border-radius:6px; font-size:0.9rem; cursor:pointer; border:none; }
+  #btn-guardar-nota{ background:var(--forest); color:#fff; }
+  #btn-fechar-modal{ background:none; border:1px solid #ccc !important; color:var(--ink); }
+  #msg-nota{ font-size:0.82rem; margin-top:8px; }
+
+  #agenda-dias{ scrollbar-width:thin; }
+  .agenda-dia-btn{ flex-shrink:0; padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; font-size:0.82rem; cursor:pointer; color:var(--ink); }
+  .agenda-dia-btn.ativo{ background:var(--forest); color:#fff; border-color:var(--forest); }
+
+  #agenda-grid table{ border-collapse:collapse; min-width:100%; }
+  #agenda-grid th, #agenda-grid td{ border:1px solid #e7e3d9; padding:0; text-align:center; font-size:0.78rem; }
+  #agenda-grid th{ background:var(--sage-light); color:var(--teal-text); padding:8px 10px; white-space:nowrap; }
+  #agenda-grid td.hora-label{ background:var(--sage-light); padding:6px 10px; font-weight:600; white-space:nowrap; }
+  .agenda-cell{ width:90px; height:36px; cursor:pointer; }
+  .agenda-cell.fechado{ background:#f3f1eb; }
+  .agenda-cell.livre{ background:#e2ecdb; color:#3c5a2f; }
+  .agenda-cell.reservado{ background:#f5dede; color:#8a3a3a; font-size:0.68rem; padding:2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <img src="logo.png" alt="Essencialmente">
+    <span>Painel — Essencial<em style="font-style:normal;">Mente</em></span>
+  </div>
+  <button id="btn-sair">Sair</button>
+</header>
+
+<div id="login-box">
+  <h2>Entrar</h2>
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Palavra-passe">
+  <button id="btn-entrar">Entrar</button>
+  <p id="login-erro">Email ou palavra-passe incorretos.</p>
+</div>
+
+<main id="painel">
+  <p class="resumo" id="resumo-utilizador"></p>
+
+  <div id="bloco-admin" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px; max-width:420px;">
+    <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:16px; font-size:1.1rem;">Adicionar psicólogo</h3>
+    <input type="text" id="novo-nome" placeholder="Nome" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
+    <input type="email" id="novo-email" placeholder="Email" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
+    <input type="password" id="novo-password" placeholder="Palavra-passe inicial" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
+    <input type="text" id="novo-especialidade" placeholder="Especialidade" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
+    <select id="novo-role" style="width:100%; padding:10px; margin-bottom:14px; border:1px solid #ccc; border-radius:6px;">
+      <option value="psicologo">Psicólogo</option>
+      <option value="admin">Administrador</option>
+    </select>
+    <button id="btn-criar-psicologo" style="width:100%; padding:11px; background:var(--forest); color:#fff; border:none; border-radius:6px; cursor:pointer;">Criar</button>
+    <p id="msg-criar" style="font-size:0.85rem; margin-top:10px;"></p>
+  </div>
+
+  <div id="bloco-disponibilidade" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px;">
+    <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:16px; font-size:1.1rem;">Agenda (Primeira consulta)</h3>
+
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+      <button id="agenda-prev" style="padding:8px 12px; border:1px solid #ccc; background:#fff; border-radius:6px; cursor:pointer;">‹</button>
+      <span id="agenda-data-label" style="font-weight:600; color:var(--forest); flex:1; min-width:160px;"></span>
+      <button id="agenda-next" style="padding:8px 12px; border:1px solid #ccc; background:#fff; border-radius:6px; cursor:pointer;">›</button>
+    </div>
+    <div id="agenda-dias" style="display:flex; gap:6px; overflow-x:auto; margin-bottom:16px; padding-bottom:4px;"></div>
+
+    <p style="font-size:0.78rem; color:#888; margin-bottom:12px;">
+      Toca numa célula: <span style="color:#888;">cinzento</span> = fechado, toca para abrir · <span style="color:#3c5a2f;">verde</span> = livre, toca para fechar · <span style="color:#8a3a3a;">laranja</span> = reservado, toca para ver detalhes/nota.
+    </p>
+
+    <div style="overflow-x:auto;">
+      <div id="agenda-grid"></div>
+    </div>
+  </div>
+
+  <div style="overflow-x:auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Data</th>
+        <th>Hora</th>
+        <th>Cliente</th>
+        <th>Email</th>
+        <th>Telefone</th>
+        <th>Psicólogo</th>
+        <th>Tipo</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody id="lista-consultas"></tbody>
+  </table>
+  </div>
+  <p id="vazio" style="display:none;">Ainda não há consultas marcadas.</p>
+</main>
+
+<div class="modal-fundo" id="modal-fundo">
+  <div class="modal-caixa">
+    <h3>Detalhes da marcação</h3>
+    <div class="modal-linha"><b>Cliente:</b> <span id="d-nome"></span></div>
+    <div class="modal-linha"><b>Email:</b> <span id="d-email"></span></div>
+    <div class="modal-linha"><b>Telefone:</b> <span id="d-telefone"></span></div>
+    <div class="modal-linha"><b>Psicólogo:</b> <span id="d-psicologo"></span></div>
+
+    <div id="bloco-atribuir-psicologo" style="display:none; margin-top:6px; margin-bottom:6px;">
+      <select id="d-atribuir-select" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem;">
+        <option value="">Atribuir psicólogo...</option>
+      </select>
+      <button id="btn-atribuir-psicologo" style="margin-top:8px; padding:8px 14px; background:var(--forest); color:#fff; border:none; border-radius:6px; font-size:0.85rem; cursor:pointer;">Atribuir</button>
+    </div>
+
+    <div class="modal-linha"><b>Tipo:</b> <span id="d-tipo"></span></div>
+    <div class="modal-linha"><b>Data/Hora:</b> <span id="d-datahora"></span></div>
+    <div class="modal-linha"><b>Estado:</b> <span id="d-estado"></span></div>
+
+    <label style="font-size:0.9rem; font-weight:600; color:var(--teal-text); display:block; margin-top:16px;">
+      Nota interna (só visível para a equipa)
+    </label>
+    <textarea id="d-nota" placeholder="Escreve aqui informações relevantes sobre este cliente para consulta futura..."></textarea>
+    <p id="msg-nota"></p>
+
+    <div class="modal-botoes">
+      <button id="btn-guardar-nota">Guardar nota</button>
+      <button id="btn-fechar-modal">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { getFirestore, collection, getDocs, addDoc, setDoc, deleteDoc, doc, getDoc, updateDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+  import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-functions.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBi-arHgDBIGpCCu50_yD3Yxz0reJtwuTs",
+    authDomain: "essencialmente-psicologia.firebaseapp.com",
+    projectId: "essencialmente-psicologia",
+    storageBucket: "essencialmente-psicologia.firebasestorage.app",
+    messagingSenderId: "908412673464",
+    appId: "1:908412673464:web:d838e6b1e8cc7a07ff434d"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+  const functionsApp = getFunctions(app, "us-central1");
+
+  const loginBox = document.getElementById("login-box");
+  const painel = document.getElementById("painel");
+  const btnSair = document.getElementById("btn-sair");
+  const loginErro = document.getElementById("login-erro");
+
+  document.getElementById("btn-entrar").addEventListener("click", async () => {
+    const email = document.getElementById("email").value.trim();
+    const pass = document.getElementById("password").value;
+    loginErro.style.display = "none";
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (err) {
+      console.error(err);
+      loginErro.style.display = "block";
+    }
+  });
+
+  btnSair.addEventListener("click", () => signOut(auth));
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      loginBox.style.display = "block";
+      painel.classList.remove("ativo");
+      btnSair.style.display = "none";
+      return;
+    }
+
+    // Descobrir o papel (role) do utilizador — o ID do documento em "psicologos"
+    // deve ser igual ao UID da conta de autenticação
+    const perfilRef = doc(db, "psicologos", user.uid);
+    let perfilSnap;
+    try {
+      perfilSnap = await getDoc(perfilRef);
+    } catch (erroLeitura) {
+      loginErro.textContent = "Erro técnico ao ler o perfil: " + erroLeitura.message + " (UID usado: " + user.uid + ")";
+      loginErro.style.display = "block";
+      await signOut(auth);
+      return;
+    }
+
+    if (!perfilSnap.exists()) {
+      loginErro.textContent = "Não encontrei o documento em psicologos/" + user.uid + ". Confirma que o ID do documento no Firestore é exatamente este UID.";
+      loginErro.style.display = "block";
+      await signOut(auth);
+      return;
+    }
+
+    const perfil = perfilSnap.data();
+    const role = perfil.role || "psicologo";
+
+    loginBox.style.display = "none";
+    painel.classList.add("ativo");
+    btnSair.style.display = "inline-block";
+
+    document.getElementById("resumo-utilizador").textContent =
+      role === "admin"
+        ? `Sessão de administrador (${perfil.nome || user.email}) — a ver todas as consultas.`
+        : `Sessão de ${perfil.nome || user.email} — a ver as tuas consultas.`;
+
+    document.getElementById("bloco-admin").style.display = role === "admin" ? "block" : "none";
+    document.getElementById("bloco-disponibilidade").style.display = "block";
+    window.papelAtual = role;
+    window.meuUid = user.uid;
+    window.meuNome = perfil.nome || user.email;
+
+    await carregarListaPsicologosParaAtribuir();
+    carregarAgenda();
+
+    carregarConsultas(role, user.uid);
+  });
+
+  document.getElementById("btn-criar-psicologo").addEventListener("click", async () => {
+    const msg = document.getElementById("msg-criar");
+    msg.style.color = "var(--ink)";
+    msg.textContent = "A criar...";
+
+    const dados = {
+      nome: document.getElementById("novo-nome").value.trim(),
+      email: document.getElementById("novo-email").value.trim(),
+      password: document.getElementById("novo-password").value,
+      especialidade: document.getElementById("novo-especialidade").value.trim(),
+      role: document.getElementById("novo-role").value,
+    };
+
+    if (!dados.nome || !dados.email || !dados.password) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Preenche pelo menos nome, email e palavra-passe.";
+      return;
+    }
+
+    try {
+      // Força a renovação do token de autenticação antes de chamar a function,
+      // para garantir que o pedido chega autenticado
+      await auth.currentUser.getIdToken(true);
+      const criarPsicologo = httpsCallable(functionsApp, "criarPsicologo");
+      const resultado = await criarPsicologo(dados);
+      msg.style.color = "#3c5a2f";
+      msg.textContent = `Psicólogo criado com sucesso (UID: ${resultado.data.uid}).`;
+      document.getElementById("novo-nome").value = "";
+      document.getElementById("novo-email").value = "";
+      document.getElementById("novo-password").value = "";
+      document.getElementById("novo-especialidade").value = "";
+    } catch (err) {
+      console.error(err);
+      msg.style.color = "#b3452c";
+      msg.textContent = "Erro: " + err.message;
+    }
+  });
+
+  // ---- Agenda por psicólogo (Primeira consulta) ----
+  // Cada slot vive num documento com ID determinístico "<psicologoId>_<data>_<hora>",
+  // o que torna trivial abrir/fechar um horário e, ao atribuir um psicólogo a uma
+  // marcação, fechar automaticamente a hora certa na coluna certa.
+
+  let listaPsicologosParaAtribuir = [];
+
+  async function carregarListaPsicologosParaAtribuir() {
+    try {
+      const snap = await getDocs(collection(db, "psicologos"));
+      listaPsicologosParaAtribuir = [];
+      snap.forEach(docSnap => {
+        listaPsicologosParaAtribuir.push({ id: docSnap.id, nome: docSnap.data().nome || "Sem nome" });
+      });
+    } catch (err) {
+      console.error("Erro ao carregar lista de psicólogos:", err);
+    }
+  }
+
+  // ---- Grelha diária da agenda (08:00–20:00, blocos de 30 min) ----
+
+  function gerarHorasDia() {
+    const horas = [];
+    for (let h = 8; h < 20; h++) {
+      horas.push(`${String(h).padStart(2, "0")}:00`);
+      horas.push(`${String(h).padStart(2, "0")}:30`);
+    }
+    return horas;
+  }
+  const HORAS_DIA = gerarHorasDia();
+
+  function formatarDataStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  let agendaData = new Date();
+
+  function renderAgendaDias() {
+    const container = document.getElementById("agenda-dias");
+    container.innerHTML = "";
+    const hoje = new Date();
+    for (let i = 0; i < 10; i++) {
+      const d = new Date(hoje);
+      d.setDate(hoje.getDate() + i);
+      const dataStr = formatarDataStr(d);
+      const ativo = dataStr === formatarDataStr(agendaData);
+      const label = d.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" });
+      const btn = document.createElement("button");
+      btn.className = "agenda-dia-btn" + (ativo ? " ativo" : "");
+      btn.textContent = label;
+      btn.addEventListener("click", () => {
+        agendaData = new Date(d);
+        renderAgendaDias();
+        renderAgendaGrid();
+      });
+      container.appendChild(btn);
+    }
+  }
+
+  document.getElementById("agenda-prev").addEventListener("click", () => {
+    agendaData.setDate(agendaData.getDate() - 1);
+    renderAgendaDias();
+    renderAgendaGrid();
+  });
+  document.getElementById("agenda-next").addEventListener("click", () => {
+    agendaData.setDate(agendaData.getDate() + 1);
+    renderAgendaDias();
+    renderAgendaGrid();
+  });
+
+  async function renderAgendaGrid() {
+    const grid = document.getElementById("agenda-grid");
+    const label = document.getElementById("agenda-data-label");
+    const dataStr = formatarDataStr(agendaData);
+    label.textContent = agendaData.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    grid.innerHTML = "A carregar...";
+
+    const psicologosAVer = window.papelAtual === "admin"
+      ? listaPsicologosParaAtribuir
+      : listaPsicologosParaAtribuir.filter(p => p.id === window.meuUid);
+
+    if (psicologosAVer.length === 0) {
+      grid.innerHTML = '<p style="color:#888; font-size:0.85rem;">Sem psicólogos para mostrar.</p>';
+      return;
+    }
+
+    try {
+      const q = query(collection(db, "disponibilidade"), where("data", "==", dataStr));
+      const snap = await getDocs(q);
+      const slotsDia = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Mapa: psicologoId|hora -> slot
+      const mapa = {};
+      slotsDia.forEach(s => { mapa[`${s.psicologoId}|${s.hora}`] = s; });
+
+      let html = "<table><thead><tr><th></th>";
+      psicologosAVer.forEach(p => { html += `<th>${p.nome}</th>`; });
+      html += "</tr></thead><tbody>";
+
+      HORAS_DIA.forEach(hora => {
+        html += `<tr><td class="hora-label">${hora}</td>`;
+        psicologosAVer.forEach(p => {
+          const s = mapa[`${p.id}|${hora}`];
+          if (s && s.reservado) {
+            html += `<td class="agenda-cell reservado" data-psicologo="${p.id}" data-hora="${hora}" data-consulta-id="${s.consultaId || ""}">${s.clienteNome || "Reservado"}</td>`;
+          } else if (s) {
+            html += `<td class="agenda-cell livre" data-psicologo="${p.id}" data-hora="${hora}" data-psicologo-nome="${p.nome}">Livre</td>`;
+          } else {
+            html += `<td class="agenda-cell fechado" data-psicologo="${p.id}" data-hora="${hora}" data-psicologo-nome="${p.nome}"></td>`;
+          }
+        });
+        html += "</tr>";
+      });
+
+      html += "</tbody></table>";
+      grid.innerHTML = html;
+
+      grid.querySelectorAll(".agenda-cell").forEach(cel => {
+        cel.addEventListener("click", () => onClicarCelulaAgenda(cel, dataStr));
+      });
+    } catch (err) {
+      console.error("Erro ao carregar agenda:", err);
+      grid.innerHTML = '<p style="color:#888; font-size:0.85rem;">Não foi possível carregar a agenda.</p>';
+    }
+  }
+
+  async function onClicarCelulaAgenda(cel, dataStr) {
+    const psicologoId = cel.dataset.psicologo;
+    const hora = cel.dataset.hora;
+
+    // Só pode mexer na própria coluna, exceto se for admin
+    if (window.papelAtual !== "admin" && psicologoId !== window.meuUid) return;
+
+    if (cel.classList.contains("reservado")) {
+      const consultaId = cel.dataset.consultaId;
+      if (consultaId && window.consultasCache[consultaId]) {
+        abrirDetalhes(consultaId);
+      }
+      return;
+    }
+
+    const slotId = `${psicologoId}_${dataStr}_${hora}`;
+
+    try {
+      if (cel.classList.contains("livre")) {
+        // Fechar
+        await deleteDoc(doc(db, "disponibilidade", slotId));
+      } else {
+        // Abrir
+        await setDoc(doc(db, "disponibilidade", slotId), {
+          psicologoId: psicologoId,
+          psicologoNome: cel.dataset.psicologoNome || "",
+          data: dataStr,
+          hora: hora,
+          reservado: false,
+          clienteNome: "",
+          consultaId: "",
+        });
+      }
+      renderAgendaGrid();
+    } catch (err) {
+      console.error("Erro ao atualizar horário:", err);
+    }
+  }
+
+  function carregarAgenda() {
+    renderAgendaDias();
+    renderAgendaGrid();
+  }
+
+  document.getElementById("btn-atribuir-psicologo").addEventListener("click", async () => {
+    if (!consultaAtualId) return;
+    const select = document.getElementById("d-atribuir-select");
+    const psicologoId = select.value;
+    const psicologoNome = select.selectedOptions[0]?.textContent || "";
+    if (!psicologoId) return;
+
+    const c = window.consultasCache[consultaAtualId];
+
+    try {
+      await updateDoc(doc(db, "consultas", consultaAtualId), {
+        psicologoId: psicologoId,
+        psicologoNome: psicologoNome,
+      });
+      c.psicologoId = psicologoId;
+      c.psicologoNome = psicologoNome;
+      window.consultasCache[consultaAtualId] = c;
+      document.getElementById("d-psicologo").textContent = psicologoNome;
+      document.getElementById("bloco-atribuir-psicologo").style.display = "none";
+
+      // Fecha automaticamente a hora certa na coluna do psicólogo escolhido,
+      // com o nome do cliente e ligação a esta marcação (para aceder à nota)
+      const slotId = `${psicologoId}_${c.data}_${c.hora}`;
+      await setDoc(doc(db, "disponibilidade", slotId), {
+        psicologoId: psicologoId,
+        psicologoNome: psicologoNome,
+        data: c.data,
+        hora: c.hora,
+        reservado: true,
+        clienteNome: c.clienteNome || "",
+        consultaId: consultaAtualId,
+      }, { merge: true });
+
+      // Atualiza também a linha na tabela
+      const linha = document.querySelector(`tr[data-id="${consultaAtualId}"]`);
+      if (linha) linha.children[5].textContent = psicologoNome;
+
+      carregarAgenda();
+    } catch (err) {
+      console.error("Erro ao atribuir psicólogo:", err);
+    }
+  });
+
+  async function carregarConsultas(role, psicologoId) {
+    const corpo = document.getElementById("lista-consultas");
+    const vazio = document.getElementById("vazio");
+    corpo.innerHTML = "";
+
+    let consultasQuery;
+    if (role === "admin") {
+      consultasQuery = query(collection(db, "consultas"), orderBy("data", "desc"));
+    } else {
+      consultasQuery = query(collection(db, "consultas"), where("psicologoId", "==", psicologoId), orderBy("data", "desc"));
+    }
+
+    try {
+      const snap = await getDocs(consultasQuery);
+      if (snap.empty) {
+        vazio.style.display = "block";
+        return;
+      }
+      snap.forEach(docSnap => {
+        const c = docSnap.data();
+        window.consultasCache[docSnap.id] = c;
+
+        const tr = document.createElement("tr");
+        tr.className = "linha-consulta";
+        tr.dataset.id = docSnap.id;
+        const naoVista = !c.visualizada;
+        tr.innerHTML = `
+          <td>${c.data || "-"}</td>
+          <td>${c.hora || "-"}</td>
+          <td>${naoVista ? '<span class="badge-novo"></span>' : ''}${c.clienteNome || "-"}</td>
+          <td>${c.clienteEmail || "-"}</td>
+          <td>${c.clienteTelefone || "-"}</td>
+          <td>${c.psicologoNome || "-"}</td>
+          <td>${c.tipo || "-"}</td>
+          <td><span class="estado estado-${c.estado || "confirmada"}">${c.estado || "confirmada"}</span></td>
+        `;
+        tr.addEventListener("click", () => abrirDetalhes(docSnap.id));
+        corpo.appendChild(tr);
+      });
+    } catch (err) {
+      console.error("Erro ao carregar consultas:", err);
+      vazio.textContent = "Não foi possível carregar as consultas.";
+      vazio.style.display = "block";
+    }
+  }
+
+  window.consultasCache = {};
+  let consultaAtualId = null;
+
+  async function abrirDetalhes(id) {
+    const c = window.consultasCache[id];
+    if (!c) return;
+    consultaAtualId = id;
+
+    document.getElementById("d-nome").textContent = c.clienteNome || "-";
+    document.getElementById("d-email").textContent = c.clienteEmail || "-";
+    document.getElementById("d-telefone").textContent = c.clienteTelefone || "-";
+    document.getElementById("d-psicologo").textContent = c.psicologoNome || "-";
+    document.getElementById("d-tipo").textContent = c.tipo || "-";
+    document.getElementById("d-datahora").textContent = `${c.data || "-"} às ${c.hora || "-"}`;
+    document.getElementById("d-estado").textContent = c.estado || "confirmada";
+    document.getElementById("d-nota").value = c.notaInterna || "";
+    document.getElementById("msg-nota").textContent = "";
+
+    // Mostra o bloco de atribuir psicólogo se ainda não tiver um definido (só para admin)
+    const blocoAtribuir = document.getElementById("bloco-atribuir-psicologo");
+    if (!c.psicologoId && window.papelAtual === "admin") {
+      const select = document.getElementById("d-atribuir-select");
+      select.innerHTML = '<option value="">Atribuir psicólogo...</option>';
+      listaPsicologosParaAtribuir.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p.id;
+        opt.textContent = p.nome;
+        select.appendChild(opt);
+      });
+      blocoAtribuir.style.display = "block";
+    } else {
+      blocoAtribuir.style.display = "none";
+    }
+
+    document.getElementById("modal-fundo").classList.add("ativo");
+
+    // Marca como visualizada, se ainda não estava
+    if (!c.visualizada) {
+      try {
+        await updateDoc(doc(db, "consultas", id), { visualizada: true });
+        c.visualizada = true;
+        window.consultasCache[id] = c;
+        const linha = document.querySelector(`tr[data-id="${id}"] .badge-novo`);
+        if (linha) linha.remove();
+      } catch (err) {
+        console.error("Erro ao marcar como visualizada:", err);
+      }
+    }
+  }
+
+  document.getElementById("btn-fechar-modal").addEventListener("click", () => {
+    document.getElementById("modal-fundo").classList.remove("ativo");
+  });
+
+  document.getElementById("btn-guardar-nota").addEventListener("click", async () => {
+    if (!consultaAtualId) return;
+    const msg = document.getElementById("msg-nota");
+    const nota = document.getElementById("d-nota").value;
+    msg.style.color = "var(--ink)";
+    msg.textContent = "A guardar...";
+    try {
+      await updateDoc(doc(db, "consultas", consultaAtualId), { notaInterna: nota });
+      window.consultasCache[consultaAtualId].notaInterna = nota;
+      msg.style.color = "#3c5a2f";
+      msg.textContent = "Nota guardada.";
+    } catch (err) {
+      console.error("Erro ao guardar nota:", err);
+      msg.style.color = "#b3452c";
+      msg.textContent = "Não foi possível guardar a nota.";
+    }
+  });
+</script>
+
+</body>
+</html>
