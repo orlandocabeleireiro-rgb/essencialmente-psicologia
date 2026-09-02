@@ -73,12 +73,15 @@
     <p id="msg-criar" style="font-size:0.85rem; margin-top:10px;"></p>
   </div>
 
+  <div style="overflow-x:auto;">
   <table>
     <thead>
       <tr>
         <th>Data</th>
         <th>Hora</th>
         <th>Cliente</th>
+        <th>Email</th>
+        <th>Telefone</th>
         <th>Psicólogo</th>
         <th>Tipo</th>
         <th>Estado</th>
@@ -86,6 +89,7 @@
     </thead>
     <tbody id="lista-consultas"></tbody>
   </table>
+  </div>
   <p id="vazio" style="display:none;">Ainda não há consultas marcadas.</p>
 </main>
 
@@ -236,6 +240,8 @@
           <td>${c.data || "-"}</td>
           <td>${c.hora || "-"}</td>
           <td>${c.clienteNome || "-"}</td>
+          <td>${c.clienteEmail || "-"}</td>
+          <td>${c.clienteTelefone || "-"}</td>
           <td>${c.psicologoNome || "-"}</td>
           <td>${c.tipo || "-"}</td>
           <td><span class="estado estado-${c.estado || "confirmada"}">${c.estado || "confirmada"}</span></td>
