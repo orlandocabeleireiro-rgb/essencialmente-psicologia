@@ -166,17 +166,42 @@
     <div class="modal-linha"><b>Email:</b> <span id="d-email"></span></div>
     <div class="modal-linha"><b>Telefone:</b> <span id="d-telefone"></span></div>
     <div class="modal-linha"><b>Psicólogo:</b> <span id="d-psicologo"></span></div>
-
-    <div id="bloco-atribuir-psicologo" style="display:none; margin-top:6px; margin-bottom:6px;">
-      <select id="d-atribuir-select" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem;">
-        <option value="">Atribuir psicólogo...</option>
-      </select>
-      <button id="btn-atribuir-psicologo" style="margin-top:8px; padding:8px 14px; background:var(--forest); color:#fff; border:none; border-radius:6px; font-size:0.85rem; cursor:pointer;">Atribuir</button>
-    </div>
-
     <div class="modal-linha"><b>Tipo:</b> <span id="d-tipo"></span></div>
     <div class="modal-linha"><b>Data/Hora:</b> <span id="d-datahora"></span></div>
     <div class="modal-linha"><b>Estado:</b> <span id="d-estado"></span></div>
+
+    <!-- Edição da marcação — só visível para admin. Permite alterar o
+         psicólogo, a data/hora ou o estado, e cancelar a marcação. -->
+    <div id="bloco-editar-marcacao" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid #eee;">
+      <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Psicólogo</label>
+      <select id="d-editar-psicologo" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem; margin-bottom:10px;">
+        <option value="">Sem psicólogo atribuído</option>
+      </select>
+
+      <div style="display:flex; gap:10px; margin-bottom:10px;">
+        <div style="flex:1;">
+          <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Data</label>
+          <input type="date" id="d-editar-data" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Hora</label>
+          <input type="time" id="d-editar-hora" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem;">
+        </div>
+      </div>
+
+      <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Estado</label>
+      <select id="d-editar-estado" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem;">
+        <option value="confirmada">Confirmada</option>
+        <option value="cancelada">Cancelada</option>
+        <option value="realizada">Realizada</option>
+      </select>
+
+      <div class="modal-botoes">
+        <button id="btn-guardar-marcacao">Guardar alterações</button>
+        <button id="btn-cancelar-marcacao" style="background:none; border:1px solid #b3452c !important; color:#b3452c;">Cancelar marcação</button>
+      </div>
+      <p id="msg-editar-marcacao" style="font-size:0.82rem; margin-top:8px;"></p>
+    </div>
 
     <label style="font-size:0.9rem; font-weight:600; color:var(--teal-text); display:block; margin-top:16px;">
       Nota interna (só visível para a equipa)
@@ -610,46 +635,132 @@
     renderAgendaGrid();
   }
 
-  document.getElementById("btn-atribuir-psicologo").addEventListener("click", async () => {
-    if (!consultaAtualId) return;
-    const select = document.getElementById("d-atribuir-select");
-    const psicologoId = select.value;
-    const psicologoNome = select.selectedOptions[0]?.textContent || "";
-    if (!psicologoId) return;
+  // Liberta o slot de disponibilidade antigo (psicologoId/data/hora), mas só
+  // se ele ainda pertencer a esta consulta — evita libertar por engano um
+  // slot que, entretanto, já tenha sido reatribuído a outra marcação.
+  async function libertarSlotSeForDesta(consultaId, psicologoId, data, hora) {
+    if (!psicologoId || !data || !hora) return;
+    const slotId = `${psicologoId}_${data}_${hora}`;
+    const slotSnap = await getDoc(doc(db, "disponibilidade", slotId));
+    if (slotSnap.exists() && slotSnap.data().consultaId === consultaId) {
+      await setDoc(doc(db, "disponibilidade", slotId), { reservado: false, consultaId: "" }, { merge: true });
+    }
+  }
 
+  // Atualiza a linha correspondente na tabela de consultas, sem precisar de
+  // recarregar tudo do Firestore.
+  function atualizarLinhaConsulta(id, c) {
+    const linha = document.querySelector(`tr[data-id="${id}"]`);
+    if (!linha) return;
+    linha.children[0].textContent = c.data || "-";
+    linha.children[1].textContent = c.hora || "-";
+    linha.children[5].textContent = c.psicologoNome || "-";
+    linha.children[7].innerHTML = `<span class="estado estado-${c.estado || "confirmada"}">${c.estado || "confirmada"}</span>`;
+  }
+
+  document.getElementById("btn-guardar-marcacao").addEventListener("click", async () => {
+    if (!consultaAtualId) return;
+    const msg = document.getElementById("msg-editar-marcacao");
     const c = window.consultasCache[consultaAtualId];
 
+    const select = document.getElementById("d-editar-psicologo");
+    const novoPsicologoId = select.value;
+    const novoPsicologoNome = select.selectedOptions[0]?.textContent === "Sem psicólogo atribuído" ? "" : (select.selectedOptions[0]?.textContent || "");
+    const novaData = document.getElementById("d-editar-data").value;
+    const novaHora = document.getElementById("d-editar-hora").value;
+    const novoEstado = document.getElementById("d-editar-estado").value;
+
+    if (!novaData || !novaHora) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Preenche a data e a hora.";
+      return;
+    }
+
+    const psicologoMudou = novoPsicologoId !== (c.psicologoId || "");
+    const dataHoraMudou = novaData !== c.data || novaHora !== c.hora;
+    const estadoMudou = novoEstado !== (c.estado || "confirmada");
+
+    if (!psicologoMudou && !dataHoraMudou && !estadoMudou) {
+      msg.style.color = "var(--ink)";
+      msg.textContent = "Sem alterações.";
+      return;
+    }
+
+    msg.style.color = "var(--ink)";
+    msg.textContent = "A guardar...";
+
     try {
-      await updateDoc(doc(db, "consultas", consultaAtualId), {
-        psicologoId: psicologoId,
-        psicologoNome: psicologoNome,
-      });
-      c.psicologoId = psicologoId;
-      c.psicologoNome = psicologoNome;
+      const updates = { estado: novoEstado };
+      if (psicologoMudou) { updates.psicologoId = novoPsicologoId; updates.psicologoNome = novoPsicologoNome; }
+      if (dataHoraMudou) { updates.data = novaData; updates.hora = novaHora; }
+      await updateDoc(doc(db, "consultas", consultaAtualId), updates);
+
+      // Se mudou o psicólogo e/ou a data/hora, atualiza os slots de
+      // disponibilidade: liberta o antigo (se ainda for desta consulta) e
+      // reserva o novo (se houver psicólogo atribuído e a marcação não
+      // tiver ficado cancelada). Se só o estado passou a "cancelada", sem
+      // reagendamento, liberta a hora atual da mesma forma.
+      if (psicologoMudou || dataHoraMudou) {
+        await libertarSlotSeForDesta(consultaAtualId, c.psicologoId, c.data, c.hora);
+        if (novoPsicologoId && novoEstado !== "cancelada") {
+          const novoSlotId = `${novoPsicologoId}_${novaData}_${novaHora}`;
+          await setDoc(doc(db, "disponibilidade", novoSlotId), {
+            psicologoId: novoPsicologoId,
+            psicologoNome: novoPsicologoNome,
+            data: novaData,
+            hora: novaHora,
+            reservado: true,
+            consultaId: consultaAtualId,
+          }, { merge: true });
+        }
+      } else if (estadoMudou && novoEstado === "cancelada") {
+        await libertarSlotSeForDesta(consultaAtualId, c.psicologoId, c.data, c.hora);
+      }
+
+      Object.assign(c, updates);
       window.consultasCache[consultaAtualId] = c;
-      document.getElementById("d-psicologo").textContent = psicologoNome;
-      document.getElementById("bloco-atribuir-psicologo").style.display = "none";
+      document.getElementById("d-psicologo").textContent = c.psicologoNome || "-";
+      document.getElementById("d-datahora").textContent = `${c.data} às ${c.hora}`;
+      document.getElementById("d-estado").textContent = c.estado || "confirmada";
+      atualizarLinhaConsulta(consultaAtualId, c);
 
-      // Fecha automaticamente a hora certa na coluna do psicólogo escolhido,
-      // com ligação a esta marcação (para aceder à nota). O nome do cliente
-      // não é guardado aqui — fica só na coleção protegida "consultas".
-      const slotId = `${psicologoId}_${c.data}_${c.hora}`;
-      await setDoc(doc(db, "disponibilidade", slotId), {
-        psicologoId: psicologoId,
-        psicologoNome: psicologoNome,
-        data: c.data,
-        hora: c.hora,
-        reservado: true,
-        consultaId: consultaAtualId,
-      }, { merge: true });
-
-      // Atualiza também a linha na tabela
-      const linha = document.querySelector(`tr[data-id="${consultaAtualId}"]`);
-      if (linha) linha.children[5].textContent = psicologoNome;
-
+      msg.style.color = "#3c5a2f";
+      msg.textContent = "Alterações guardadas.";
       carregarAgenda();
     } catch (err) {
-      console.error("Erro ao atribuir psicólogo:", err);
+      console.error("Erro ao guardar alterações da marcação:", err);
+      msg.style.color = "#b3452c";
+      msg.textContent = "Não foi possível guardar: " + err.message;
+    }
+  });
+
+  document.getElementById("btn-cancelar-marcacao").addEventListener("click", async () => {
+    if (!consultaAtualId) return;
+    const c = window.consultasCache[consultaAtualId];
+    if (!confirm(`Cancelar a marcação de ${c.clienteNome || "este cliente"} em ${c.data} às ${c.hora}?`)) return;
+
+    const msg = document.getElementById("msg-editar-marcacao");
+    msg.style.color = "var(--ink)";
+    msg.textContent = "A cancelar...";
+
+    try {
+      await updateDoc(doc(db, "consultas", consultaAtualId), { estado: "cancelada" });
+      // Liberta a hora na agenda do psicólogo, para poder ser reservada de novo.
+      await libertarSlotSeForDesta(consultaAtualId, c.psicologoId, c.data, c.hora);
+
+      c.estado = "cancelada";
+      window.consultasCache[consultaAtualId] = c;
+      document.getElementById("d-estado").textContent = "cancelada";
+      document.getElementById("d-editar-estado").value = "cancelada";
+      atualizarLinhaConsulta(consultaAtualId, c);
+
+      msg.style.color = "#3c5a2f";
+      msg.textContent = "Marcação cancelada.";
+      carregarAgenda();
+    } catch (err) {
+      console.error("Erro ao cancelar marcação:", err);
+      msg.style.color = "#b3452c";
+      msg.textContent = "Não foi possível cancelar: " + err.message;
     }
   });
 
@@ -717,20 +828,26 @@
     document.getElementById("d-nota").value = c.notaInterna || "";
     document.getElementById("msg-nota").textContent = "";
 
-    // Mostra o bloco de atribuir psicólogo se ainda não tiver um definido (só para admin)
-    const blocoAtribuir = document.getElementById("bloco-atribuir-psicologo");
-    if (!c.psicologoId && window.papelAtual === "admin") {
-      const select = document.getElementById("d-atribuir-select");
-      select.innerHTML = '<option value="">Atribuir psicólogo...</option>';
+    // Bloco de edição da marcação — só para admin: permite alterar o
+    // psicólogo, a data/hora ou o estado, e cancelar a marcação.
+    const blocoEditar = document.getElementById("bloco-editar-marcacao");
+    document.getElementById("msg-editar-marcacao").textContent = "";
+    if (window.papelAtual === "admin") {
+      const select = document.getElementById("d-editar-psicologo");
+      select.innerHTML = '<option value="">Sem psicólogo atribuído</option>';
       listaPsicologosParaAtribuir.forEach(p => {
         const opt = document.createElement("option");
         opt.value = p.id;
         opt.textContent = p.nome;
         select.appendChild(opt);
       });
-      blocoAtribuir.style.display = "block";
+      select.value = c.psicologoId || "";
+      document.getElementById("d-editar-data").value = c.data || "";
+      document.getElementById("d-editar-hora").value = c.hora || "";
+      document.getElementById("d-editar-estado").value = c.estado || "confirmada";
+      blocoEditar.style.display = "block";
     } else {
-      blocoAtribuir.style.display = "none";
+      blocoEditar.style.display = "none";
     }
 
     document.getElementById("modal-fundo").classList.add("ativo");
