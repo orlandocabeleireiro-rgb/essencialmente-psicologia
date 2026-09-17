@@ -53,11 +53,15 @@
   #btn-fechar-modal{ background:none; border:1px solid #ccc !important; color:var(--ink); }
   #msg-nota{ font-size:0.82rem; margin-top:8px; }
 
-  #agenda-dias{ scrollbar-width:thin; }
+  #agenda-dias{ scrollbar-width:thin; position:relative; }
+  #agenda-dias.tem-mais-scroll{ mask-image:linear-gradient(to right, #000 calc(100% - 28px), transparent); -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 28px), transparent); }
   .agenda-dia-btn{ flex-shrink:0; padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; font-size:0.82rem; cursor:pointer; color:var(--ink); }
   .agenda-dia-btn.ativo{ background:var(--forest); color:#fff; border-color:var(--forest); }
 
-  #agenda-grid table{ border-collapse:collapse; table-layout:fixed; }
+  /* width:auto (em vez do "table{width:100%}" geral) para as colunas
+     manterem a largura fixa de 90px definida abaixo, em vez de serem
+     esticadas/deformadas para preencher o ecrã. */
+  #agenda-grid table{ border-collapse:collapse; table-layout:fixed; width:auto; }
   #agenda-grid th, #agenda-grid td{ border:1px solid #e7e3d9; padding:0; text-align:center; font-size:0.78rem; width:90px; min-width:90px; max-width:90px; }
   #agenda-grid th{ background:var(--sage-light); color:var(--teal-text); padding:8px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #agenda-grid td.hora-label{ background:var(--sage-light); padding:6px; font-weight:600; white-space:nowrap; }
@@ -457,7 +461,18 @@
       });
       container.appendChild(btn);
     }
+    // Mostra um desvanecido no fim da fila só quando há mais dias por ver
+    // (arrastando), para não parecer que o último botão está cortado.
+    container.classList.toggle("tem-mais-scroll", container.scrollWidth > container.clientWidth + 1);
   }
+
+  // Ao arrastar a fila de dias, esconde o desvanecido quando já não há
+  // mais nada a seguir (chegou ao fim do scroll).
+  document.getElementById("agenda-dias").addEventListener("scroll", (ev) => {
+    const c = ev.target;
+    const chegouAoFim = c.scrollLeft + c.clientWidth >= c.scrollWidth - 1;
+    c.classList.toggle("tem-mais-scroll", !chegouAoFim);
+  });
 
   document.getElementById("agenda-prev").addEventListener("click", () => {
     agendaData.setDate(agendaData.getDate() - 1);
