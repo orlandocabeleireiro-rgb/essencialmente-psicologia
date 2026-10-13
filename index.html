@@ -144,10 +144,12 @@
       <input type="email" id="m-email" placeholder="Email" style="padding:11px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem;">
       <input type="tel" id="m-telefone" placeholder="Telefone" style="padding:11px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem;">
 
+      <!-- "Primeira consulta" é fixa (tem lógica própria, só escolha de
+           horário). As restantes opções vêm da coleção "tiposConsulta",
+           geridas pelo admin. -->
       <select id="m-tipo" style="padding:11px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem;">
+        <option value="" disabled selected>Tipos de consulta</option>
         <option value="Primeira consulta">Primeira consulta</option>
-        <option value="Consulta de acompanhamento">Consulta de acompanhamento</option>
-        <option value="Consulta de casal">Consulta de casal</option>
       </select>
 
       <!-- Para "Primeira consulta": só escolha de horário disponível, sem escolher psicólogo -->
@@ -314,6 +316,28 @@
   }
   carregarHorariosDisponiveis();
 
+  // Carrega os tipos de consulta adicionais (geridos pelo admin) e junta-os
+  // ao select, a seguir à opção fixa "Primeira consulta".
+  async function carregarTiposConsulta() {
+    const select = document.getElementById("m-tipo");
+    try {
+      const snap = await getDocs(
+        query(collection(db, "tiposConsulta"), orderBy("criadoEm", "asc"))
+      );
+      snap.forEach(docSnap => {
+        const t = docSnap.data();
+        if (!t.nome) return;
+        const opt = document.createElement("option");
+        opt.value = t.nome;
+        opt.textContent = t.nome;
+        select.appendChild(opt);
+      });
+    } catch (err) {
+      console.error("Erro ao carregar tipos de consulta:", err);
+    }
+  }
+  carregarTiposConsulta();
+
   // Impede escolher uma data passada no calendário (outros tipos de consulta)
   document.getElementById("m-data").min = dataHojeStr();
 
@@ -326,9 +350,13 @@
     if (selectTipo.value === "Primeira consulta") {
       blocoPrimeira.style.display = "block";
       blocoOutros.style.display = "none";
-    } else {
+    } else if (selectTipo.value) {
       blocoPrimeira.style.display = "none";
       blocoOutros.style.display = "flex";
+    } else {
+      // Nenhum tipo escolhido ainda (continua no placeholder "Tipos de consulta")
+      blocoPrimeira.style.display = "none";
+      blocoOutros.style.display = "none";
     }
   }
   selectTipo.addEventListener("change", atualizarBlocoTipo);
@@ -341,6 +369,12 @@
     const email = document.getElementById("m-email").value.trim();
     const telefone = document.getElementById("m-telefone").value.trim();
     const tipo = selectTipo.value;
+
+    if (!tipo) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Escolhe um tipo de consulta.";
+      return;
+    }
 
     let dadosConsulta = null;
     let slotEscolhido = null; // { psicologoId, data, hora } — para fechar depois
