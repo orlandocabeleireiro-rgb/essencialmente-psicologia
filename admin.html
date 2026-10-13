@@ -124,6 +124,19 @@
     </div>
   </div>
 
+  <div id="bloco-tipos-consulta" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px; max-width:420px;">
+    <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:16px; font-size:1.1rem;">Tipos de consulta</h3>
+    <p style="font-size:0.85rem; color:#888; margin-bottom:14px;">
+      "Primeira consulta" é fixa (o cliente só escolhe a hora, sem indicar psicólogo). Os tipos abaixo aparecem a seguir, no site público — o cliente escolhe psicólogo, data e hora livremente.
+    </p>
+    <div style="display:flex; gap:8px; margin-bottom:14px;">
+      <input type="text" id="novo-tipo-nome" placeholder="Nome do tipo de consulta" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:6px;">
+      <button id="btn-criar-tipo" style="padding:10px 16px; background:var(--forest); color:#fff; border:none; border-radius:6px; cursor:pointer;">Adicionar</button>
+    </div>
+    <p id="msg-criar-tipo" style="font-size:0.85rem; margin-bottom:10px;"></p>
+    <div id="lista-tipos-consulta" style="display:flex; flex-direction:column; gap:6px;"></div>
+  </div>
+
   <div id="bloco-disponibilidade" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px;">
     <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:16px; font-size:1.1rem;">Agenda (Primeira consulta)</h3>
 
@@ -222,7 +235,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-  import { getFirestore, enableIndexedDbPersistence, collection, getDocs, addDoc, setDoc, deleteDoc, doc, getDoc, updateDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getFirestore, enableIndexedDbPersistence, collection, getDocs, addDoc, setDoc, deleteDoc, doc, getDoc, updateDoc, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
   import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-functions.js";
 
@@ -308,6 +321,7 @@
         : `Sessão de ${perfil.nome || user.email} — a ver as tuas consultas.`;
 
     document.getElementById("bloco-admin").style.display = role === "admin" ? "block" : "none";
+    document.getElementById("bloco-tipos-consulta").style.display = role === "admin" ? "block" : "none";
     document.getElementById("bloco-backup").style.display = role === "admin" ? "block" : "none";
     document.getElementById("bloco-disponibilidade").style.display = "block";
     window.papelAtual = role;
@@ -315,7 +329,10 @@
     window.meuNome = perfil.nome || user.email;
 
     await carregarListaPsicologosParaAtribuir();
-    if (role === "admin") carregarListaGerirPsicologos();
+    if (role === "admin") {
+      carregarListaGerirPsicologos();
+      carregarListaTiposConsulta();
+    }
 
     // Carregamos as consultas primeiro (preenche window.consultasCache com
     // os nomes dos clientes) antes de desenhar a agenda, que precisa desse
@@ -448,6 +465,103 @@
       carregarAgenda();
     } catch (err) {
       console.error("Erro ao remover psicólogo:", err);
+      alert("Não foi possível remover: " + err.message);
+    }
+  }
+
+  // ---- Gerir tipos de consulta (além da fixa "Primeira consulta") ----
+  // Mostrados no site público, pela ordem de criação.
+
+  let listaTiposConsulta = [];
+
+  async function carregarListaTiposConsulta() {
+    const container = document.getElementById("lista-tipos-consulta");
+    try {
+      const snap = await getDocs(query(collection(db, "tiposConsulta"), orderBy("criadoEm", "asc")));
+      listaTiposConsulta = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (err) {
+      console.error("Erro ao carregar tipos de consulta:", err);
+      container.innerHTML = '<p style="color:#888; font-size:0.85rem;">Não foi possível carregar.</p>';
+      return;
+    }
+
+    if (listaTiposConsulta.length === 0) {
+      container.innerHTML = '<p style="color:#888; font-size:0.85rem;">Ainda sem tipos adicionados.</p>';
+      return;
+    }
+    container.innerHTML = "";
+    listaTiposConsulta.forEach(t => {
+      const linha = document.createElement("div");
+      linha.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:var(--sage-light); border-radius:6px; font-size:0.85rem; gap:8px;";
+      linha.innerHTML = `
+        <span>${t.nome}</span>
+        <span style="display:flex; gap:10px;">
+          <button data-acao="editar" style="background:none; border:none; color:var(--teal-text); cursor:pointer; font-size:0.8rem;">Editar</button>
+          <button data-acao="remover" style="background:none; border:none; color:#b3452c; cursor:pointer; font-size:0.8rem;">Remover</button>
+        </span>
+      `;
+      linha.querySelector('[data-acao="editar"]').addEventListener("click", () => editarTipoConsulta(t.id, t.nome));
+      linha.querySelector('[data-acao="remover"]').addEventListener("click", () => removerTipoConsulta(t.id, t.nome));
+      container.appendChild(linha);
+    });
+  }
+
+  document.getElementById("btn-criar-tipo").addEventListener("click", async () => {
+    const input = document.getElementById("novo-tipo-nome");
+    const msg = document.getElementById("msg-criar-tipo");
+    const nome = input.value.trim();
+
+    if (!nome) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Escreve um nome para o tipo de consulta.";
+      return;
+    }
+    if (nome === "Primeira consulta" || listaTiposConsulta.some(t => t.nome === nome)) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Já existe um tipo de consulta com esse nome.";
+      return;
+    }
+
+    msg.style.color = "var(--ink)";
+    msg.textContent = "A adicionar...";
+    try {
+      await addDoc(collection(db, "tiposConsulta"), { nome, criadoEm: serverTimestamp() });
+      input.value = "";
+      msg.textContent = "";
+      carregarListaTiposConsulta();
+    } catch (err) {
+      console.error("Erro ao adicionar tipo de consulta:", err);
+      msg.style.color = "#b3452c";
+      msg.textContent = "Não foi possível adicionar: " + err.message;
+    }
+  });
+
+  async function editarTipoConsulta(id, nomeAtual) {
+    const novoNome = prompt("Novo nome para este tipo de consulta:", nomeAtual);
+    if (novoNome === null) return;
+    const nome = novoNome.trim();
+    if (!nome || nome === nomeAtual) return;
+    if (nome === "Primeira consulta" || listaTiposConsulta.some(t => t.nome === nome)) {
+      alert("Já existe um tipo de consulta com esse nome.");
+      return;
+    }
+    try {
+      await updateDoc(doc(db, "tiposConsulta", id), { nome });
+      carregarListaTiposConsulta();
+    } catch (err) {
+      console.error("Erro ao editar tipo de consulta:", err);
+      alert("Não foi possível guardar: " + err.message);
+    }
+  }
+
+  async function removerTipoConsulta(id, nome) {
+    const confirmado = confirm(`Remover o tipo de consulta "${nome}"?\n\nDeixa de aparecer no formulário de marcação — as consultas já feitas com este tipo não são afetadas.`);
+    if (!confirmado) return;
+    try {
+      await deleteDoc(doc(db, "tiposConsulta", id));
+      carregarListaTiposConsulta();
+    } catch (err) {
+      console.error("Erro ao remover tipo de consulta:", err);
       alert("Não foi possível remover: " + err.message);
     }
   }
