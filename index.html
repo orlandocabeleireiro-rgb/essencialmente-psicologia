@@ -269,6 +269,17 @@
     console.warn("Persistência offline não ativada:", err.code);
   });
 
+  // Data/hora atuais, no mesmo formato usado nos documentos (YYYY-MM-DD /
+  // HH:MM) — usadas para nunca mostrar nem aceitar horários já passados.
+  function dataHojeStr() {
+    const agora = new Date();
+    return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}-${String(agora.getDate()).padStart(2, "0")}`;
+  }
+  function horaAgoraStr() {
+    const agora = new Date();
+    return `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`;
+  }
+
   // Regista o service worker (cache do "esqueleto" da app para abrir offline)
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
@@ -336,11 +347,14 @@
       const snap = await getDocs(q);
 
       // Remove duplicados (a mesma data+hora pode estar aberta por mais do
-      // que um psicólogo) e ordena cronologicamente.
+      // que um psicólogo), descarta horários já passados e ordena
+      // cronologicamente.
+      const agoraChave = dataHojeStr() + horaAgoraStr();
       const unicos = new Map();
       snap.docs.forEach(docSnap => {
         const d = docSnap.data();
         if (!idsElegiveis.has(d.psicologoId)) return;
+        if (`${d.data}${d.hora}` <= agoraChave) return;
         const chave = `${d.data}|${d.hora}`;
         if (!unicos.has(chave)) unicos.set(chave, d);
       });
@@ -370,6 +384,9 @@
     }
   }
   carregarHorariosDisponiveis();
+
+  // Impede escolher uma data passada no calendário (outros tipos de consulta)
+  document.getElementById("m-data").min = dataHojeStr();
 
   // Alterna entre os dois blocos consoante o tipo de consulta escolhido
   const selectTipo = document.getElementById("m-tipo");
@@ -439,6 +456,12 @@
       if (!nome || !email || !psicologoId || !data || !hora) {
         msg.style.color = "#b3452c";
         msg.textContent = "Preenche pelo menos nome, email, psicólogo, data e hora.";
+        return;
+      }
+
+      if (`${data}${hora}` <= dataHojeStr() + horaAgoraStr()) {
+        msg.style.color = "#b3452c";
+        msg.textContent = "Escolhe uma data e hora que ainda não tenham passado.";
         return;
       }
 
