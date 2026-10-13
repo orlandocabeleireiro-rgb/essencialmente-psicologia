@@ -155,8 +155,6 @@
     <span>Essencial<em style="font-style:normal; color:var(--sage-text);">Mente</em></span>
   </div>
   <nav>
-    <a href="#tipos">Consultas</a>
-    <a href="#sobre">Sobre</a>
     <a href="#marcar" class="cta-btn">Marcar consulta</a>
   </nav>
 </header>
@@ -167,36 +165,11 @@
     <p>Consultas de psicologia online, com uma equipa de psicólogos disponível para te acompanhar onde quer que estejas.</p>
     <div class="hero-actions">
       <a href="#marcar" class="primary">Marcar consulta</a>
-      <a href="#tipos" class="secondary">Ver tipos de consulta</a>
+      <a href="https://essencialmentepsi.com" class="secondary" target="_blank" rel="noopener">Ver tipos de consulta</a>
     </div>
   </div>
   <div class="hero-visual">
     <img src="logo.png" alt="Essencialmente" style="width:92%; max-width:340px; border-radius:50%;">
-  </div>
-</section>
-
-<section class="tipos" id="tipos">
-  <h2>Tipos de consulta</h2>
-  <div class="cards">
-    <div class="card">
-      <h3>Primeira consulta</h3>
-      <p>Avaliação inicial para perceber o que te traz até aqui e desenhar o plano de acompanhamento.</p>
-    </div>
-    <div class="card">
-      <h3>Consulta de acompanhamento</h3>
-      <p>Sessões regulares de continuidade do processo terapêutico.</p>
-    </div>
-    <div class="card">
-      <h3>Consulta de casal</h3>
-      <p>Espaço partilhado para trabalhar a relação com o apoio de um psicólogo.</p>
-    </div>
-  </div>
-</section>
-
-<section class="tipos" id="sobre">
-  <h2>A nossa equipa</h2>
-  <div class="cards" id="lista-psicologos">
-    <!-- Preenchido dinamicamente a partir da coleção "psicologos" no Firestore -->
   </div>
 </section>
 
@@ -289,27 +262,20 @@
   window.db = db;
   window.auth = auth;
 
-  // Carrega os psicólogos da coleção "psicologos" — mostra-os na secção "A nossa equipa"
-  // e preenche o menu do formulário de marcação (para tipos que não sejam "Primeira consulta")
+  // Carrega os psicólogos da coleção "psicologos" para preencher o menu do
+  // formulário de marcação (para tipos que não sejam "Primeira consulta").
+  // A apresentação da equipa passou a viver só no site principal.
   async function carregarPsicologos() {
-    const container = document.getElementById("lista-psicologos");
     const select = document.getElementById("m-psicologo");
     try {
       const snap = await getDocs(collection(db, "psicologos"));
       if (snap.empty) {
-        container.innerHTML = '<p style="color:#888;">Ainda sem psicólogos adicionados.</p>';
         select.innerHTML = '<option value="">Sem psicólogos disponíveis</option>';
         return;
       }
-      container.innerHTML = "";
       select.innerHTML = '<option value="">Escolhe um psicólogo</option>';
       snap.forEach(docSnap => {
         const p = docSnap.data();
-        const card = document.createElement("div");
-        card.className = "card";
-        card.innerHTML = `<h3>${p.nome || "Sem nome"}</h3><p>${p.especialidade || ""}</p>`;
-        container.appendChild(card);
-
         const opt = document.createElement("option");
         opt.value = docSnap.id;
         opt.textContent = p.nome || "Sem nome";
@@ -318,7 +284,7 @@
       });
     } catch (err) {
       console.error("Erro ao carregar psicólogos:", err);
-      container.innerHTML = '<p style="color:#888;">Não foi possível carregar a equipa.</p>';
+      select.innerHTML = '<option value="">Não foi possível carregar os psicólogos</option>';
     }
   }
   carregarPsicologos();
