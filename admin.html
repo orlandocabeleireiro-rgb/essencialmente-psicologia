@@ -692,12 +692,14 @@
       return;
     }
     const confirmado = confirm(
-      `Remover ${nome} do sistema?\n\nIsto retira-lhe o acesso ao painel imediatamente. A conta de login em Authentication não é apagada automaticamente — se quiseres removê-la por completo, faz isso também na consola Firebase.`
+      `Remover ${nome} do sistema?\n\nIsto apaga o perfil e a conta de login (Authentication) por completo — não é reversível.`
     );
     if (!confirmado) return;
 
     try {
-      await deleteDoc(doc(db, "psicologos", id));
+      await auth.currentUser.getIdToken(true);
+      const removerPsicologoFn = httpsCallable(functionsApp, "removerPsicologo");
+      await removerPsicologoFn({ uid: id });
       await carregarListaPsicologosParaAtribuir();
       carregarListaGerirPsicologos();
       carregarAgenda();
