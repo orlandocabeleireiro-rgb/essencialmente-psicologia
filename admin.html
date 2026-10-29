@@ -186,6 +186,9 @@
     <div class="modal-linha"><b>Tipo:</b> <span id="d-tipo"></span></div>
     <div class="modal-linha"><b>Data/Hora:</b> <span id="d-datahora"></span></div>
     <div class="modal-linha"><b>Estado:</b> <span id="d-estado"></span></div>
+    <div class="modal-linha" id="linha-link-consulta" style="display:none;">
+      <b>Link da consulta:</b> <a id="d-link" href="#" target="_blank" rel="noopener" style="word-break:break-all;"></a>
+    </div>
 
     <!-- Edição da marcação — só visível para admin. Permite alterar o
          psicólogo, a data/hora ou o estado, e cancelar a marcação. -->
@@ -218,6 +221,23 @@
         <button id="btn-cancelar-marcacao" style="background:none; border:1px solid #b3452c !important; color:#b3452c;">Cancelar marcação</button>
       </div>
       <p id="msg-editar-marcacao" style="font-size:0.82rem; margin-top:8px;"></p>
+
+      <div style="margin-top:18px; padding-top:14px; border-top:1px solid #eee;">
+        <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Link da consulta (videochamada)</label>
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <input type="text" id="d-link-input" placeholder="Cola um link, ou gera um automático" style="flex:1; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.85rem;">
+          <button id="btn-gerar-link" style="padding:9px 12px; border:1px solid #ccc; background:#fff; border-radius:6px; cursor:pointer; font-size:0.8rem; white-space:nowrap;">Gerar</button>
+        </div>
+        <div class="modal-botoes" style="margin-top:0;">
+          <button id="btn-guardar-link">Guardar link</button>
+          <button id="btn-copiar-link" style="background:none; border:1px solid #ccc !important; color:var(--ink);">Copiar</button>
+        </div>
+        <div class="modal-botoes" style="margin-top:8px;">
+          <button id="btn-enviar-whatsapp" style="background:#25864a; color:#fff;">Enviar por WhatsApp</button>
+          <button id="btn-enviar-email" style="background:none; border:1px solid var(--forest) !important; color:var(--forest);">Enviar por Email</button>
+        </div>
+        <p id="msg-link" style="font-size:0.82rem; margin-top:8px;"></p>
+      </div>
     </div>
 
     <label style="font-size:0.9rem; font-weight:600; color:var(--teal-text); display:block; margin-top:16px;">
@@ -882,6 +902,118 @@
     }
   });
 
+  // ---- Link da consulta (videochamada) ----
+  // Gera uma sala Jitsi Meet única por consulta (gratuita, sem conta nem
+  // instalação) — o admin pode sempre substituir por outro link (Zoom,
+  // Google Meet, etc.) antes de guardar.
+  document.getElementById("btn-gerar-link").addEventListener("click", () => {
+    if (!consultaAtualId) return;
+    document.getElementById("d-link-input").value = `https://meet.jit.si/Essencialmente-${consultaAtualId}`;
+  });
+
+  document.getElementById("btn-guardar-link").addEventListener("click", async () => {
+    if (!consultaAtualId) return;
+    const msg = document.getElementById("msg-link");
+    const link = document.getElementById("d-link-input").value.trim();
+
+    msg.style.color = "var(--ink)";
+    msg.textContent = "A guardar...";
+    try {
+      await updateDoc(doc(db, "consultas", consultaAtualId), { linkConsulta: link });
+      const c = window.consultasCache[consultaAtualId];
+      c.linkConsulta = link;
+      window.consultasCache[consultaAtualId] = c;
+
+      const linhaLink = document.getElementById("linha-link-consulta");
+      const linkEl = document.getElementById("d-link");
+      if (link) {
+        linkEl.textContent = link;
+        linkEl.href = link;
+        linhaLink.style.display = "block";
+      } else {
+        linhaLink.style.display = "none";
+      }
+
+      msg.style.color = "#3c5a2f";
+      msg.textContent = "Link guardado.";
+    } catch (err) {
+      console.error("Erro ao guardar link da consulta:", err);
+      msg.style.color = "#b3452c";
+      msg.textContent = "Não foi possível guardar: " + err.message;
+    }
+  });
+
+  document.getElementById("btn-copiar-link").addEventListener("click", async () => {
+    const msg = document.getElementById("msg-link");
+    const link = document.getElementById("d-link-input").value.trim();
+    if (!link) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Não há nenhum link para copiar.";
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(link);
+      msg.style.color = "#3c5a2f";
+      msg.textContent = "Link copiado.";
+    } catch (err) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Não foi possível copiar automaticamente — seleciona e copia o link manualmente.";
+    }
+  });
+
+  // Limpa um número de telefone para o formato que o WhatsApp espera
+  // (só dígitos, com indicativo de país). Assume Portugal (351) quando o
+  // número guardado já não tem indicativo (9 dígitos, sem "+").
+  function telefoneParaWhatsapp(telefone) {
+    const digitos = (telefone || "").replace(/\D/g, "");
+    if (!digitos) return "";
+    if (telefone.trim().startsWith("+")) return digitos;
+    if (digitos.length === 9) return "351" + digitos;
+    return digitos;
+  }
+
+  document.getElementById("btn-enviar-whatsapp").addEventListener("click", () => {
+    if (!consultaAtualId) return;
+    const c = window.consultasCache[consultaAtualId];
+    const msg = document.getElementById("msg-link");
+    const link = document.getElementById("d-link-input").value.trim();
+
+    if (!link || link !== (c.linkConsulta || "")) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Guarda o link primeiro (botão \"Guardar link\").";
+      return;
+    }
+    const numero = telefoneParaWhatsapp(c.clienteTelefone);
+    if (!numero) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Esta marcação não tem telefone guardado.";
+      return;
+    }
+    const texto = `Olá ${c.clienteNome || ""}! A sua consulta (${c.tipo || ""}) está marcada para ${c.data} às ${c.hora}. Aqui está o link para a videochamada: ${link}\n\nAté já! — Essencialmente`;
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, "_blank");
+  });
+
+  document.getElementById("btn-enviar-email").addEventListener("click", () => {
+    if (!consultaAtualId) return;
+    const c = window.consultasCache[consultaAtualId];
+    const msg = document.getElementById("msg-link");
+    const link = document.getElementById("d-link-input").value.trim();
+
+    if (!link || link !== (c.linkConsulta || "")) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Guarda o link primeiro (botão \"Guardar link\").";
+      return;
+    }
+    if (!c.clienteEmail) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Esta marcação não tem email guardado.";
+      return;
+    }
+    const assunto = "Link da sua consulta — Essencialmente";
+    const corpo = `Olá ${c.clienteNome || ""},\n\nA sua consulta (${c.tipo || ""}) está marcada para ${c.data} às ${c.hora}.\n\nAqui está o link para a videochamada:\n${link}\n\nAté já!\nEssencialmente`;
+    window.location.href = `mailto:${encodeURIComponent(c.clienteEmail)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+  });
+
   async function carregarConsultas(role, psicologoId) {
     const corpo = document.getElementById("lista-consultas");
     const vazio = document.getElementById("vazio");
@@ -946,6 +1078,17 @@
     document.getElementById("d-nota").value = c.notaInterna || "";
     document.getElementById("msg-nota").textContent = "";
 
+    // Link da consulta — visível a todos (admin e psicólogo) em modo leitura
+    const linhaLink = document.getElementById("linha-link-consulta");
+    const linkEl = document.getElementById("d-link");
+    if (c.linkConsulta) {
+      linkEl.textContent = c.linkConsulta;
+      linkEl.href = c.linkConsulta;
+      linhaLink.style.display = "block";
+    } else {
+      linhaLink.style.display = "none";
+    }
+
     // Bloco de edição da marcação — só para admin: permite alterar o
     // psicólogo, a data/hora ou o estado, e cancelar a marcação.
     const blocoEditar = document.getElementById("bloco-editar-marcacao");
@@ -963,6 +1106,8 @@
       document.getElementById("d-editar-data").value = c.data || "";
       document.getElementById("d-editar-hora").value = c.hora || "";
       document.getElementById("d-editar-estado").value = c.estado || "confirmada";
+      document.getElementById("d-link-input").value = c.linkConsulta || "";
+      document.getElementById("msg-link").textContent = "";
       blocoEditar.style.display = "block";
     } else {
       blocoEditar.style.display = "none";
