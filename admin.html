@@ -292,6 +292,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app-check.js";
   import { getFirestore, enableIndexedDbPersistence, collection, getDocs, addDoc, setDoc, deleteDoc, doc, getDoc, updateDoc, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
   import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-functions.js";
@@ -306,6 +307,14 @@
   };
 
   const app = initializeApp(firebaseConfig);
+  // App Check (Fraud Defense / reCAPTCHA Enterprise) — mesma proteção do
+  // site público; aqui só garante que o painel também passa a apresentar
+  // token válido, para nenhuma ação (incluindo as já autenticadas) ficar
+  // em risco de bloqueio se decidirmos reforçar mais no futuro.
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider("6LfK2wYuAAAAAPkaH17v5ki8q0uFETzqMLW5k12Q"),
+    isTokenAutoRefreshEnabled: true,
+  });
   const db = getFirestore(app);
   enableIndexedDbPersistence(db).catch((err) => {
     console.warn("Persistência offline não ativada:", err.code);
