@@ -911,13 +911,10 @@
     document.getElementById("d-link-input").value = `https://meet.jit.si/Essencialmente-${consultaAtualId}`;
   });
 
-  document.getElementById("btn-guardar-link").addEventListener("click", async () => {
-    if (!consultaAtualId) return;
-    const msg = document.getElementById("msg-link");
-    const link = document.getElementById("d-link-input").value.trim();
-
-    msg.style.color = "var(--ink)";
-    msg.textContent = "A guardar...";
+  // Guarda o link atual do campo em Firestore e atualiza a UI (linha de
+  // leitura + cache). Devolve o link guardado, ou null se falhou.
+  async function guardarLinkConsulta(link) {
+    if (!consultaAtualId) return null;
     try {
       await updateDoc(doc(db, "consultas", consultaAtualId), { linkConsulta: link });
       const c = window.consultasCache[consultaAtualId];
@@ -933,11 +930,23 @@
       } else {
         linhaLink.style.display = "none";
       }
+      return link;
+    } catch (err) {
+      console.error("Erro ao guardar link da consulta:", err);
+      throw err;
+    }
+  }
 
+  document.getElementById("btn-guardar-link").addEventListener("click", async () => {
+    const msg = document.getElementById("msg-link");
+    const link = document.getElementById("d-link-input").value.trim();
+    msg.style.color = "var(--ink)";
+    msg.textContent = "A guardar...";
+    try {
+      await guardarLinkConsulta(link);
       msg.style.color = "#3c5a2f";
       msg.textContent = "Link guardado.";
     } catch (err) {
-      console.error("Erro ao guardar link da consulta:", err);
       msg.style.color = "#b3452c";
       msg.textContent = "Não foi possível guardar: " + err.message;
     }
@@ -972,46 +981,84 @@
     return digitos;
   }
 
-  document.getElementById("btn-enviar-whatsapp").addEventListener("click", () => {
+  // Abre um URL externo (WhatsApp, mailto, ...) simulando o clique num
+  // link real, em vez de window.open()/location.href — mais fiável em
+  // browsers móveis e no modo "app" (atalho no ecrã principal), onde
+  // essas chamadas por vezes são bloqueadas sem aviso.
+  function abrirLink(url) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  // Garante que há um link guardado antes de enviar: se o campo estiver
+  // vazio, gera a sala Jitsi automática; se o texto no campo ainda não
+  // tiver sido guardado, guarda-o agora. Assim, "Enviar" funciona com um
+  // único clique, sem exigir que o admin clique primeiro em "Gerar"/
+  // "Guardar link".
+  async function garantirLinkParaEnvio() {
+    const msg = document.getElementById("msg-link");
+    const input = document.getElementById("d-link-input");
+    const c = window.consultasCache[consultaAtualId];
+    let link = input.value.trim();
+
+    if (!link) {
+      link = `https://meet.jit.si/Essencialmente-${consultaAtualId}`;
+      input.value = link;
+    }
+    if (link === (c.linkConsulta || "")) return link;
+
+    msg.style.color = "var(--ink)";
+    msg.textContent = "A preparar o link...";
+    try {
+      await guardarLinkConsulta(link);
+      msg.textContent = "";
+      return link;
+    } catch (err) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Não foi possível guardar o link: " + err.message;
+      return null;
+    }
+  }
+
+  document.getElementById("btn-enviar-whatsapp").addEventListener("click", async () => {
     if (!consultaAtualId) return;
     const c = window.consultasCache[consultaAtualId];
     const msg = document.getElementById("msg-link");
-    const link = document.getElementById("d-link-input").value.trim();
 
-    if (!link || link !== (c.linkConsulta || "")) {
-      msg.style.color = "#b3452c";
-      msg.textContent = "Guarda o link primeiro (botão \"Guardar link\").";
-      return;
-    }
     const numero = telefoneParaWhatsapp(c.clienteTelefone);
     if (!numero) {
       msg.style.color = "#b3452c";
       msg.textContent = "Esta marcação não tem telefone guardado.";
       return;
     }
+    const link = await garantirLinkParaEnvio();
+    if (!link) return;
+
     const texto = `Olá ${c.clienteNome || ""}! A sua consulta (${c.tipo || ""}) está marcada para ${c.data} às ${c.hora}. Aqui está o link para a videochamada: ${link}\n\nAté já! — Essencialmente`;
-    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, "_blank");
+    abrirLink(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`);
   });
 
-  document.getElementById("btn-enviar-email").addEventListener("click", () => {
+  document.getElementById("btn-enviar-email").addEventListener("click", async () => {
     if (!consultaAtualId) return;
     const c = window.consultasCache[consultaAtualId];
     const msg = document.getElementById("msg-link");
-    const link = document.getElementById("d-link-input").value.trim();
 
-    if (!link || link !== (c.linkConsulta || "")) {
-      msg.style.color = "#b3452c";
-      msg.textContent = "Guarda o link primeiro (botão \"Guardar link\").";
-      return;
-    }
     if (!c.clienteEmail) {
       msg.style.color = "#b3452c";
       msg.textContent = "Esta marcação não tem email guardado.";
       return;
     }
+    const link = await garantirLinkParaEnvio();
+    if (!link) return;
+
     const assunto = "Link da sua consulta — Essencialmente";
     const corpo = `Olá ${c.clienteNome || ""},\n\nA sua consulta (${c.tipo || ""}) está marcada para ${c.data} às ${c.hora}.\n\nAqui está o link para a videochamada:\n${link}\n\nAté já!\nEssencialmente`;
-    window.location.href = `mailto:${encodeURIComponent(c.clienteEmail)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+    abrirLink(`mailto:${encodeURIComponent(c.clienteEmail)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
   });
 
   async function carregarConsultas(role, psicologoId) {
