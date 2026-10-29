@@ -32,6 +32,9 @@
   main{ display:none; padding:4vw 5vw; }
   main.ativo{ display:block; }
   .resumo{ font-size:0.9rem; color:#5c5c52; margin-bottom:24px; }
+  #admin-tabs{ display:flex; gap:4px; overflow-x:auto; margin-bottom:24px; border-bottom:1px solid #e7e3d9; }
+  .admin-tab-btn{ flex-shrink:0; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:0.88rem; color:#5c5c52; border-bottom:2px solid transparent; white-space:nowrap; }
+  .admin-tab-btn.ativo{ color:var(--forest); border-bottom-color:var(--forest); font-weight:600; }
   table{ width:100%; border-collapse:collapse; background:#fff; }
   th, td{ text-align:left; padding:12px 14px; border-bottom:1px solid #eee; font-size:0.9rem; }
   th{ background:var(--sage-light); color:var(--teal-text); font-weight:600; }
@@ -96,12 +99,55 @@
 <main id="painel">
   <p class="resumo" id="resumo-utilizador"></p>
 
-  <div id="bloco-backup" style="display:none; margin-bottom:24px;">
-    <button id="btn-exportar-backup" style="padding:10px 18px; background:none; border:1px solid var(--forest); color:var(--forest); border-radius:6px; cursor:pointer; font-size:0.9rem;">Exportar backup (JSON)</button>
-    <p id="msg-backup" style="font-size:0.82rem; margin-top:8px;"></p>
+  <div id="admin-tabs">
+    <button class="admin-tab-btn" data-aba="agenda">Agenda</button>
+    <button class="admin-tab-btn" data-aba="consultas">Consultas</button>
+    <button class="admin-tab-btn so-admin" data-aba="psicologos">Psicólogos</button>
+    <button class="admin-tab-btn so-admin" data-aba="tipos">Tipos de consulta</button>
+    <button class="admin-tab-btn so-admin" data-aba="backup">Backup</button>
   </div>
 
-  <div id="bloco-admin" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px; max-width:420px;">
+  <div id="bloco-disponibilidade" class="aba-conteudo" data-aba="agenda" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px;">
+    <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:16px; font-size:1.1rem;">Agenda (Primeira consulta)</h3>
+
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+      <button id="agenda-prev" style="padding:8px 12px; border:1px solid #ccc; background:#fff; border-radius:6px; cursor:pointer;">‹</button>
+      <span id="agenda-data-label" style="font-weight:600; color:var(--forest); flex:1; min-width:160px;"></span>
+      <button id="agenda-next" style="padding:8px 12px; border:1px solid #ccc; background:#fff; border-radius:6px; cursor:pointer;">›</button>
+    </div>
+    <div id="agenda-dias" style="display:flex; gap:6px; overflow-x:auto; margin-bottom:16px; padding-bottom:4px;"></div>
+
+    <p style="font-size:0.78rem; color:#888; margin-bottom:12px;">
+      Toca numa célula: <span style="color:#888;">cinzento</span> = fechado, toca para abrir · <span style="color:#3c5a2f;">verde</span> = livre, toca para fechar · <span style="color:#8a3a3a;">laranja</span> = reservado, toca para ver detalhes/nota.
+    </p>
+
+    <div style="overflow-x:auto;">
+      <div id="agenda-grid"></div>
+    </div>
+  </div>
+
+  <div class="aba-conteudo" data-aba="consultas" style="display:none;">
+    <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Hora</th>
+          <th>Cliente</th>
+          <th>Email</th>
+          <th>Telefone</th>
+          <th>Psicólogo</th>
+          <th>Tipo</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody id="lista-consultas"></tbody>
+    </table>
+    </div>
+    <p id="vazio" style="display:none;">Ainda não há consultas marcadas.</p>
+  </div>
+
+  <div id="bloco-admin" class="aba-conteudo" data-aba="psicologos" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px; max-width:420px;">
     <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:16px; font-size:1.1rem;">Adicionar psicólogo</h3>
     <input type="text" id="novo-nome" placeholder="Nome" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
     <input type="email" id="novo-email" placeholder="Email" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
@@ -124,7 +170,7 @@
     </div>
   </div>
 
-  <div id="bloco-tipos-consulta" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px; max-width:420px;">
+  <div id="bloco-tipos-consulta" class="aba-conteudo" data-aba="tipos" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px; max-width:420px;">
     <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:16px; font-size:1.1rem;">Tipos de consulta</h3>
     <p style="font-size:0.85rem; color:#888; margin-bottom:14px;">
       "Primeira consulta" é fixa (o cliente só escolhe a hora, sem indicar psicólogo). Os tipos abaixo aparecem a seguir, no site público — o cliente escolhe psicólogo, data e hora livremente.
@@ -137,43 +183,10 @@
     <div id="lista-tipos-consulta" style="display:flex; flex-direction:column; gap:6px;"></div>
   </div>
 
-  <div id="bloco-disponibilidade" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px;">
-    <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:16px; font-size:1.1rem;">Agenda (Primeira consulta)</h3>
-
-    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
-      <button id="agenda-prev" style="padding:8px 12px; border:1px solid #ccc; background:#fff; border-radius:6px; cursor:pointer;">‹</button>
-      <span id="agenda-data-label" style="font-weight:600; color:var(--forest); flex:1; min-width:160px;"></span>
-      <button id="agenda-next" style="padding:8px 12px; border:1px solid #ccc; background:#fff; border-radius:6px; cursor:pointer;">›</button>
-    </div>
-    <div id="agenda-dias" style="display:flex; gap:6px; overflow-x:auto; margin-bottom:16px; padding-bottom:4px;"></div>
-
-    <p style="font-size:0.78rem; color:#888; margin-bottom:12px;">
-      Toca numa célula: <span style="color:#888;">cinzento</span> = fechado, toca para abrir · <span style="color:#3c5a2f;">verde</span> = livre, toca para fechar · <span style="color:#8a3a3a;">laranja</span> = reservado, toca para ver detalhes/nota.
-    </p>
-
-    <div style="overflow-x:auto;">
-      <div id="agenda-grid"></div>
-    </div>
+  <div id="bloco-backup" class="aba-conteudo" data-aba="backup" style="display:none; margin-bottom:24px;">
+    <button id="btn-exportar-backup" style="padding:10px 18px; background:none; border:1px solid var(--forest); color:var(--forest); border-radius:6px; cursor:pointer; font-size:0.9rem;">Exportar backup (JSON)</button>
+    <p id="msg-backup" style="font-size:0.82rem; margin-top:8px;"></p>
   </div>
-
-  <div style="overflow-x:auto;">
-  <table>
-    <thead>
-      <tr>
-        <th>Data</th>
-        <th>Hora</th>
-        <th>Cliente</th>
-        <th>Email</th>
-        <th>Telefone</th>
-        <th>Psicólogo</th>
-        <th>Tipo</th>
-        <th>Estado</th>
-      </tr>
-    </thead>
-    <tbody id="lista-consultas"></tbody>
-  </table>
-  </div>
-  <p id="vazio" style="display:none;">Ainda não há consultas marcadas.</p>
 </main>
 
 <div class="modal-fundo" id="modal-fundo">
@@ -310,6 +323,19 @@
 
   btnSair.addEventListener("click", () => signOut(auth));
 
+  // ---- Separadores do painel (Agenda / Consultas / Psicólogos / Tipos / Backup) ----
+  function mostrarAba(nome) {
+    document.querySelectorAll(".aba-conteudo").forEach(el => {
+      el.style.display = el.dataset.aba === nome ? "block" : "none";
+    });
+    document.querySelectorAll(".admin-tab-btn").forEach(btn => {
+      btn.classList.toggle("ativo", btn.dataset.aba === nome);
+    });
+  }
+  document.querySelectorAll(".admin-tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => mostrarAba(btn.dataset.aba));
+  });
+
   onAuthStateChanged(auth, async (user) => {
     if (!user) {
       loginBox.style.display = "block";
@@ -350,10 +376,13 @@
         ? `Sessão de administrador (${perfil.nome || user.email}) — a ver todas as consultas.`
         : `Sessão de ${perfil.nome || user.email} — a ver as tuas consultas.`;
 
-    document.getElementById("bloco-admin").style.display = role === "admin" ? "block" : "none";
-    document.getElementById("bloco-tipos-consulta").style.display = role === "admin" ? "block" : "none";
-    document.getElementById("bloco-backup").style.display = role === "admin" ? "block" : "none";
-    document.getElementById("bloco-disponibilidade").style.display = "block";
+    // As secções só-admin (Psicólogos, Tipos de consulta, Backup) só
+    // aparecem como separadores para quem é admin; Agenda e Consultas são
+    // visíveis para todos.
+    document.querySelectorAll(".admin-tab-btn.so-admin").forEach(btn => {
+      btn.style.display = role === "admin" ? "inline-block" : "none";
+    });
+    mostrarAba("agenda");
     window.papelAtual = role;
     window.meuUid = user.uid;
     window.meuNome = perfil.nome || user.email;
