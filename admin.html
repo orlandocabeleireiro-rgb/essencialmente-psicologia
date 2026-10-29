@@ -47,11 +47,12 @@
   tr.linha-consulta:hover{ background:var(--sage-light); }
   .badge-novo{ display:inline-block; width:8px; height:8px; border-radius:50%; background:#c98a5e; margin-right:8px; }
 
-  .modal-fundo{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:50; align-items:center; justify-content:center; padding:20px; }
+  .modal-fundo{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.58); z-index:50; align-items:center; justify-content:center; padding:20px; }
   .modal-fundo.ativo{ display:flex; }
-  .modal-caixa{ background:#fff; border-radius:10px; padding:28px; max-width:480px; width:100%; max-height:85vh; overflow-y:auto; }
-  .modal-caixa h3{ font-family:'Fraunces', serif; color:var(--forest); margin-bottom:18px; font-size:1.2rem; }
-  .modal-linha{ margin-bottom:10px; font-size:0.92rem; }
+  .modal-caixa{ background:#fff; border-radius:12px; padding:34px; max-width:640px; width:100%; max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3); transition:max-width 0.15s ease; }
+  .modal-caixa.ampliado{ max-width:960px; }
+  .modal-caixa h3{ font-family:'Fraunces', serif; color:var(--forest); margin-bottom:18px; font-size:1.4rem; }
+  .modal-linha{ margin-bottom:10px; font-size:1.02rem; }
   .modal-linha b{ color:var(--teal-text); }
   .modal-caixa textarea{ width:100%; min-height:110px; padding:10px; border:1px solid #ccc; border-radius:6px; font-family:inherit; font-size:0.9rem; margin-top:6px; resize:vertical; }
   .modal-botoes{ display:flex; gap:10px; margin-top:16px; }
@@ -190,8 +191,11 @@
 </main>
 
 <div class="modal-fundo" id="modal-fundo">
-  <div class="modal-caixa">
-    <h3>Detalhes da marcação</h3>
+  <div class="modal-caixa" id="modal-caixa">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+      <h3 style="margin-bottom:0;">Detalhes da marcação</h3>
+      <button id="btn-ampliar-modal" title="Ampliar" style="background:none; border:1px solid #ccc; color:var(--ink); border-radius:6px; padding:6px 10px; cursor:pointer; font-size:1rem; line-height:1;">⤢</button>
+    </div>
     <div class="modal-linha"><b>Cliente:</b> <span id="d-nome"></span></div>
     <div class="modal-linha"><b>Email:</b> <span id="d-email"></span></div>
     <div class="modal-linha"><b>Telefone:</b> <span id="d-telefone"></span></div>
@@ -340,6 +344,35 @@
   }
   document.querySelectorAll(".admin-tab-btn").forEach(btn => {
     btn.addEventListener("click", () => mostrarAba(btn.dataset.aba));
+  });
+
+  // ---- Ampliar o modal "Detalhes da marcação" (útil em ecrãs de computador) ----
+  // A escolha fica guardada neste browser/computador, para não ter de repetir
+  // sempre que abre uma marcação.
+  const modalCaixa = document.getElementById("modal-caixa");
+  const btnAmpliarModal = document.getElementById("btn-ampliar-modal");
+
+  function aplicarEstadoAmpliado(ampliado) {
+    modalCaixa.classList.toggle("ampliado", ampliado);
+    btnAmpliarModal.textContent = ampliado ? "⤡" : "⤢";
+    btnAmpliarModal.title = ampliado ? "Reduzir" : "Ampliar";
+  }
+  let modalAmpliado = false;
+  try {
+    modalAmpliado = localStorage.getItem("modalMarcacaoAmpliado") === "true";
+  } catch (err) {
+    // Sem acesso ao localStorage (ex: navegação privada) — continua, só sem memorizar.
+  }
+  aplicarEstadoAmpliado(modalAmpliado);
+
+  btnAmpliarModal.addEventListener("click", () => {
+    modalAmpliado = !modalAmpliado;
+    aplicarEstadoAmpliado(modalAmpliado);
+    try {
+      localStorage.setItem("modalMarcacaoAmpliado", modalAmpliado);
+    } catch (err) {
+      // Sem acesso ao localStorage — a escolha só vale para esta sessão.
+    }
   });
 
   onAuthStateChanged(auth, async (user) => {
