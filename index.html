@@ -460,6 +460,7 @@
       };
 
       dadosConsulta = {
+        clienteNome: nome,
         psicologoId: opt.dataset.psicologoId,
         psicologoNome: opt.dataset.psicologoNome || "",
         tipo: tipo,
@@ -490,6 +491,7 @@
       }
 
       dadosConsulta = {
+        clienteNome: nome,
         psicologoId: psicologoId,
         psicologoNome: psicologoNome,
         tipo: tipo,
@@ -508,13 +510,13 @@
     try {
       const novaConsultaRef = await addDoc(collection(db, "consultas"), dadosConsulta);
 
-      // O nome/email/telefone do cliente fica à parte, numa subcoleção só
-      // legível por quem tem permissão para ver dados de contacto (admin,
-      // ou psicólogo com "Ver todas as consultas") — para um psicólogo
-      // normal nunca conseguir ler os contactos dos seus clientes a partir
-      // da Firestore, mesmo abrindo a consola do browser.
+      // Email/telefone do cliente ficam à parte, numa subcoleção só legível
+      // por quem tem permissão para ver dados de contacto (admin, ou
+      // psicólogo com "Ver todas as consultas") — para um psicólogo normal
+      // não conseguir contactar os seus clientes fora da plataforma, mesmo
+      // abrindo a consola do browser. O nome fica no documento principal
+      // (visível ao psicólogo responsável, para saber quem vai atender).
       await setDoc(doc(db, "consultas", novaConsultaRef.id, "privado", "dados"), {
-        clienteNome: nome,
         clienteEmail: email,
         clienteTelefone: telefone,
       });
