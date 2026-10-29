@@ -158,6 +158,14 @@
           <option value="">A carregar horários disponíveis...</option>
         </select>
         <p style="font-size:0.8rem; color:#888; margin-top:6px;">O psicólogo será atribuído pela nossa equipa após a marcação.</p>
+
+        <button type="button" id="btn-mostrar-espera" style="background:none; border:none; color:var(--forest); text-decoration:underline; font-size:0.85rem; padding:0; margin-top:10px; cursor:pointer;">Nenhum destes horários serve? Pede que te contactemos</button>
+
+        <div id="bloco-lista-espera" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid #e7e3d9;">
+          <textarea id="m-espera-notas" placeholder="Preferências de dia/hora (opcional) — ex: de manhã, ou qualquer dia da próxima semana" style="width:100%; min-height:70px; padding:10px; border:1px solid #ccc; border-radius:6px; font-family:inherit; font-size:0.9rem; resize:vertical;"></textarea>
+          <button type="button" id="btn-pedir-espera" style="margin-top:8px; padding:11px; width:100%; background:var(--forest); color:#faf8f3; border:none; border-radius:6px; font-size:0.95rem; cursor:pointer;">Pedir que me contactem</button>
+          <p id="msg-espera" style="font-size:0.85rem; margin-top:8px;"></p>
+        </div>
       </div>
 
       <!-- Para outros tipos: escolha de psicólogo, data e hora livremente -->
@@ -361,6 +369,53 @@
   }
   selectTipo.addEventListener("change", atualizarBlocoTipo);
   atualizarBlocoTipo();
+
+  // "Pedir que me contactem" — para quem não encontra um horário que sirva
+  // na lista de "Primeira consulta". Fica guardado em "listaEspera" para a
+  // equipa ligar/escrever e agendar manualmente.
+  const btnMostrarEspera = document.getElementById("btn-mostrar-espera");
+  const blocoListaEspera = document.getElementById("bloco-lista-espera");
+  btnMostrarEspera.addEventListener("click", () => {
+    const aberto = blocoListaEspera.style.display === "block";
+    blocoListaEspera.style.display = aberto ? "none" : "block";
+    btnMostrarEspera.textContent = aberto
+      ? "Nenhum destes horários serve? Pede que te contactemos"
+      : "Esconder";
+  });
+
+  document.getElementById("btn-pedir-espera").addEventListener("click", async () => {
+    const msg = document.getElementById("msg-espera");
+    const nome = document.getElementById("m-nome").value.trim();
+    const email = document.getElementById("m-email").value.trim();
+    const telefone = document.getElementById("m-telefone").value.trim();
+    const notas = document.getElementById("m-espera-notas").value.trim();
+
+    if (!nome || !email) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Preenche pelo menos o nome e o email, lá em cima.";
+      return;
+    }
+
+    msg.style.color = "var(--ink)";
+    msg.textContent = "A enviar...";
+    try {
+      await addDoc(collection(db, "listaEspera"), {
+        clienteNome: nome,
+        clienteEmail: email,
+        clienteTelefone: telefone,
+        tipo: "Primeira consulta",
+        notas: notas,
+        criadoEm: serverTimestamp(),
+      });
+      msg.style.color = "#3c5a2f";
+      msg.textContent = "Pedido enviado! Entraremos em contacto para marcar a tua consulta.";
+      document.getElementById("m-espera-notas").value = "";
+    } catch (err) {
+      console.error("Erro ao enviar pedido de contacto:", err);
+      msg.style.color = "#b3452c";
+      msg.textContent = "Não foi possível enviar. Tenta novamente.";
+    }
+  });
 
   // Submissão do formulário de marcação
   document.getElementById("btn-marcar").addEventListener("click", async () => {
