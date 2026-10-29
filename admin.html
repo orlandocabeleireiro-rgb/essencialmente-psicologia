@@ -108,6 +108,7 @@
     <button class="admin-tab-btn so-admin" data-aba="psicologos">Psicólogos</button>
     <button class="admin-tab-btn so-admin" data-aba="tipos">Tipos de consulta</button>
     <button class="admin-tab-btn so-admin" data-aba="backup">Backup</button>
+    <button class="admin-tab-btn" data-aba="conta">A minha conta</button>
   </div>
 
   <div id="bloco-disponibilidade" class="aba-conteudo" data-aba="agenda" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px;">
@@ -197,6 +198,15 @@
   <div id="bloco-backup" class="aba-conteudo" data-aba="backup" style="display:none; margin-bottom:24px;">
     <button id="btn-exportar-backup" style="padding:10px 18px; background:none; border:1px solid var(--forest); color:var(--forest); border-radius:6px; cursor:pointer; font-size:0.9rem;">Exportar backup (JSON)</button>
     <p id="msg-backup" style="font-size:0.82rem; margin-top:8px;"></p>
+  </div>
+
+  <div id="bloco-conta" class="aba-conteudo" data-aba="conta" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px; max-width:420px;">
+    <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:16px; font-size:1.1rem;">Mudar palavra-passe</h3>
+    <input type="password" id="conta-password-atual" placeholder="Palavra-passe atual" autocomplete="current-password" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
+    <input type="password" id="conta-password-nova" placeholder="Nova palavra-passe (mín. 6 carateres)" autocomplete="new-password" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
+    <input type="password" id="conta-password-confirmar" placeholder="Confirmar nova palavra-passe" autocomplete="new-password" style="width:100%; padding:10px; margin-bottom:14px; border:1px solid #ccc; border-radius:6px;">
+    <button id="btn-mudar-password" style="width:100%; padding:11px; background:var(--forest); color:#fff; border:none; border-radius:6px; cursor:pointer;">Guardar nova palavra-passe</button>
+    <p id="msg-conta-password" style="font-size:0.85rem; margin-top:10px;"></p>
   </div>
 </main>
 
@@ -294,7 +304,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app-check.js";
   import { getFirestore, enableIndexedDbPersistence, collection, getDocs, addDoc, setDoc, deleteDoc, doc, getDoc, updateDoc, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
   import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-functions.js";
 
   const firebaseConfig = {
@@ -408,6 +418,49 @@
       localStorage.setItem("modalMarcacaoAmpliado", modalAmpliado);
     } catch (err) {
       // Sem acesso ao localStorage — a escolha só vale para esta sessão.
+    }
+  });
+
+  // ---- "A minha conta" — mudar a própria palavra-passe ----
+  // Pede a palavra-passe atual e usa-a para reautenticar antes de alterar:
+  // o Firebase exige um login "recente" para esta operação, e isto evita
+  // que alguém mude a password de uma sessão aberta sem saber a atual.
+  document.getElementById("btn-mudar-password").addEventListener("click", async () => {
+    const atual = document.getElementById("conta-password-atual").value;
+    const nova = document.getElementById("conta-password-nova").value;
+    const confirmar = document.getElementById("conta-password-confirmar").value;
+    const msg = document.getElementById("msg-conta-password");
+    msg.style.color = "#b3452c";
+
+    if (!atual || !nova || !confirmar) {
+      msg.textContent = "Preenche todos os campos.";
+      return;
+    }
+    if (nova.length < 6) {
+      msg.textContent = "A nova palavra-passe tem de ter pelo menos 6 carateres.";
+      return;
+    }
+    if (nova !== confirmar) {
+      msg.textContent = "As duas palavras-passe novas não coincidem.";
+      return;
+    }
+
+    msg.style.color = "#888";
+    msg.textContent = "A atualizar...";
+    try {
+      const credencial = EmailAuthProvider.credential(auth.currentUser.email, atual);
+      await reauthenticateWithCredential(auth.currentUser, credencial);
+      await updatePassword(auth.currentUser, nova);
+      msg.style.color = "#3c6b2f";
+      msg.textContent = "Palavra-passe atualizada com sucesso.";
+      document.getElementById("conta-password-atual").value = "";
+      document.getElementById("conta-password-nova").value = "";
+      document.getElementById("conta-password-confirmar").value = "";
+    } catch (err) {
+      msg.style.color = "#b3452c";
+      msg.textContent = err.code === "auth/invalid-credential" || err.code === "auth/wrong-password"
+        ? "A palavra-passe atual está incorreta."
+        : "Não foi possível atualizar: " + err.message;
     }
   });
 
