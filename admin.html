@@ -33,8 +33,9 @@
   main.ativo{ display:block; }
   .resumo{ font-size:0.9rem; color:#5c5c52; margin-bottom:24px; }
   #admin-tabs{ display:flex; gap:4px; overflow-x:auto; margin-bottom:24px; border-bottom:1px solid #e7e3d9; }
-  .admin-tab-btn{ flex-shrink:0; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:0.88rem; color:#5c5c52; border-bottom:2px solid transparent; white-space:nowrap; }
+  .admin-tab-btn{ position:relative; flex-shrink:0; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:0.88rem; color:#5c5c52; border-bottom:2px solid transparent; white-space:nowrap; }
   .admin-tab-btn.ativo{ color:var(--forest); border-bottom-color:var(--forest); font-weight:600; }
+  .aviso-badge{ display:none; position:absolute; top:2px; right:2px; background:#b3452c; color:#fff; font-size:0.65rem; font-weight:700; border-radius:10px; min-width:16px; height:16px; line-height:16px; text-align:center; padding:0 3px; }
   table{ width:100%; border-collapse:collapse; background:#fff; }
   th, td{ text-align:left; padding:12px 14px; border-bottom:1px solid #eee; font-size:0.9rem; }
   th{ background:var(--sage-light); color:var(--teal-text); font-weight:600; }
@@ -103,7 +104,7 @@
   <div id="admin-tabs">
     <button class="admin-tab-btn" data-aba="agenda">Agenda</button>
     <button class="admin-tab-btn" data-aba="consultas">Consultas</button>
-    <button class="admin-tab-btn so-admin" data-aba="espera">Lista de espera</button>
+    <button class="admin-tab-btn so-admin" data-aba="espera">Lista de espera<span class="aviso-badge" id="badge-espera"></span></button>
     <button class="admin-tab-btn so-admin" data-aba="psicologos">Psicólogos</button>
     <button class="admin-tab-btn so-admin" data-aba="tipos">Tipos de consulta</button>
     <button class="admin-tab-btn so-admin" data-aba="backup">Backup</button>
@@ -350,6 +351,7 @@
     document.querySelectorAll(".admin-tab-btn").forEach(btn => {
       btn.classList.toggle("ativo", btn.dataset.aba === nome);
     });
+    if (nome === "espera") marcarListaEsperaComoVista();
   }
   document.querySelectorAll(".admin-tab-btn").forEach(btn => {
     btn.addEventListener("click", () => mostrarAba(btn.dataset.aba));
@@ -727,11 +729,23 @@
   // ---- Lista de espera (pedidos de contacto de quem não encontrou
   // horário de "Primeira consulta") ----
 
+  let idsNaoVistosEspera = [];
+
+  function atualizarBadgeEspera(count) {
+    const badge = document.getElementById("badge-espera");
+    if (!badge) return;
+    badge.textContent = count;
+    badge.style.display = count > 0 ? "block" : "none";
+  }
+
   async function carregarListaEspera() {
     const container = document.getElementById("lista-espera-itens");
     if (!container) return;
     try {
       const snap = await getDocs(query(collection(db, "listaEspera"), orderBy("criadoEm", "desc")));
+      idsNaoVistosEspera = snap.docs.filter(d => !d.data().visualizado).map(d => d.id);
+      atualizarBadgeEspera(idsNaoVistosEspera.length);
+
       if (snap.empty) {
         container.innerHTML = '<p style="color:#888; font-size:0.85rem;">Sem pedidos de momento.</p>';
         return;
@@ -744,7 +758,7 @@
         linha.style.cssText = "padding:12px; background:var(--sage-light); border-radius:6px; font-size:0.88rem;";
         linha.innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:6px;">
-            <b style="color:var(--teal-text);">${p.clienteNome || "Sem nome"}</b>
+            <b style="color:var(--teal-text);">${!p.visualizado ? '<span class="badge-novo"></span>' : ''}${p.clienteNome || "Sem nome"}</b>
             <button data-id="${docSnap.id}" style="background:none; border:none; color:#b3452c; cursor:pointer; font-size:0.8rem; white-space:nowrap;">Remover</button>
           </div>
           <div>${p.clienteEmail || "-"} ${p.clienteTelefone ? "· " + p.clienteTelefone : ""}</div>
@@ -757,6 +771,21 @@
     } catch (err) {
       console.error("Erro ao carregar lista de espera:", err);
       container.innerHTML = '<p style="color:#888; font-size:0.85rem;">Não foi possível carregar.</p>';
+    }
+  }
+
+  // Marca os pedidos como vistos assim que o admin abre o separador —
+  // o selo de aviso só volta a aparecer com pedidos realmente novos.
+  async function marcarListaEsperaComoVista() {
+    if (idsNaoVistosEspera.length === 0) return;
+    const ids = idsNaoVistosEspera;
+    idsNaoVistosEspera = [];
+    atualizarBadgeEspera(0);
+    document.querySelectorAll('#lista-espera-itens .badge-novo').forEach(el => el.remove());
+    try {
+      await Promise.all(ids.map(id => updateDoc(doc(db, "listaEspera", id), { visualizado: true })));
+    } catch (err) {
+      console.error("Erro ao marcar pedidos como vistos:", err);
     }
   }
 
