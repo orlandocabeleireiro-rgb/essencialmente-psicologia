@@ -168,13 +168,15 @@
         </div>
       </div>
 
-      <!-- Para outros tipos: escolha de psicólogo, data e hora livremente -->
+      <!-- Para outros tipos: escolha de psicólogo, depois só uma hora que
+           esse psicólogo já tenha marcado como disponível na agenda. -->
       <div id="bloco-outros-tipos" style="display:none; flex-direction:column; gap:14px;">
         <select id="m-psicologo" style="width:100%; padding:11px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem;">
           <option value="">A carregar psicólogos...</option>
         </select>
-        <input type="date" id="m-data" style="width:100%; padding:11px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem; margin-top:14px;">
-        <input type="time" id="m-hora" style="width:100%; padding:11px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem; margin-top:14px;">
+        <select id="m-horario-psicologo" style="width:100%; padding:11px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem;">
+          <option value="">Escolhe primeiro um psicólogo</option>
+        </select>
       </div>
 
       <button id="btn-marcar" style="padding:13px; background:var(--forest); color:#faf8f3; border:none; border-radius:6px; font-size:0.95rem; cursor:pointer;">Marcar consulta</button>
@@ -270,6 +272,52 @@
   }
   carregarPsicologos();
 
+  // Carrega as horas que o psicólogo escolhido marcou como disponíveis na
+  // agenda (para qualquer tipo de consulta que não seja "Primeira consulta")
+  // — o cliente só pode escolher entre essas, nunca uma hora livre à parte.
+  async function carregarHorariosDoPsicologo(psicologoId) {
+    const select = document.getElementById("m-horario-psicologo");
+    if (!psicologoId) {
+      select.innerHTML = '<option value="">Escolhe primeiro um psicólogo</option>';
+      return;
+    }
+    select.innerHTML = '<option value="">A carregar horários...</option>';
+    try {
+      const q = query(
+        collection(db, "disponibilidade"),
+        where("psicologoId", "==", psicologoId),
+        where("reservado", "==", false)
+      );
+      const snap = await getDocs(q);
+      const agoraChave = dataHojeStr() + horaAgoraStr();
+      const horarios = snap.docs
+        .map(d => d.data())
+        .filter(d => `${d.data}${d.hora}` > agoraChave)
+        .sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora));
+
+      if (horarios.length === 0) {
+        select.innerHTML = '<option value="">Sem horários disponíveis de momento</option>';
+        return;
+      }
+      select.innerHTML = '<option value="">Escolhe um horário</option>';
+      horarios.forEach(d => {
+        const opt = document.createElement("option");
+        opt.value = `${d.data}_${d.hora}`;
+        opt.dataset.data = d.data;
+        opt.dataset.hora = d.hora;
+        const [ano, mes, dia] = (d.data || "").split("-");
+        opt.textContent = `${dia}/${mes}/${ano} às ${d.hora}`;
+        select.appendChild(opt);
+      });
+    } catch (err) {
+      console.error("Erro ao carregar horários do psicólogo:", err);
+      select.innerHTML = `<option value="">Erro: ${err.message}</option>`;
+    }
+  }
+  document.getElementById("m-psicologo").addEventListener("change", (ev) => {
+    carregarHorariosDoPsicologo(ev.target.value);
+  });
+
   // Carrega os horários disponíveis (definidos pelo admin) para a "Primeira consulta"
   async function carregarHorariosDisponiveis() {
     const select = document.getElementById("m-horario-disponivel");
@@ -353,9 +401,6 @@
     }
   }
   carregarTiposConsulta();
-
-  // Impede escolher uma data passada no calendário (outros tipos de consulta)
-  document.getElementById("m-data").min = dataHojeStr();
 
   // Alterna entre os dois blocos consoante o tipo de consulta escolhido
   const selectTipo = document.getElementById("m-tipo");
@@ -475,28 +520,28 @@
       const psicologoSelect = document.getElementById("m-psicologo");
       const psicologoId = psicologoSelect.value;
       const psicologoNome = psicologoSelect.selectedOptions[0]?.dataset.nome || "";
-      const data = document.getElementById("m-data").value;
-      const hora = document.getElementById("m-hora").value;
+      const horarioSelect = document.getElementById("m-horario-psicologo");
+      const opt = horarioSelect.selectedOptions[0];
 
-      if (!nome || !email || !psicologoId || !data || !hora) {
+      if (!nome || !email || !psicologoId || !horarioSelect.value) {
         msg.style.color = "#b3452c";
-        msg.textContent = "Preenche pelo menos nome, email, psicólogo, data e hora.";
+        msg.textContent = "Preenche pelo menos nome, email, psicólogo e um horário.";
         return;
       }
 
-      if (`${data}${hora}` <= dataHojeStr() + horaAgoraStr()) {
-        msg.style.color = "#b3452c";
-        msg.textContent = "Escolhe uma data e hora que ainda não tenham passado.";
-        return;
-      }
+      slotEscolhido = {
+        psicologoId: psicologoId,
+        data: opt.dataset.data,
+        hora: opt.dataset.hora,
+      };
 
       dadosConsulta = {
         clienteNome: nome,
         psicologoId: psicologoId,
         psicologoNome: psicologoNome,
         tipo: tipo,
-        data: data,
-        hora: hora,
+        data: opt.dataset.data,
+        hora: opt.dataset.hora,
         estado: "confirmada",
         visualizada: false,
         notaInterna: "",
@@ -521,9 +566,8 @@
         clienteTelefone: telefone,
       });
 
-      // Se foi uma "Primeira consulta", fecha automaticamente a hora certa
-      // na coluna do psicólogo escolhido, já ligada a esta marcação. O nome
-      // do cliente não vai para esta coleção pública — fica só em "consultas".
+      // Fecha automaticamente a hora escolhida (seja da "Primeira consulta"
+      // ou de outro tipo) na coluna do psicólogo, já ligada a esta marcação.
       if (slotEscolhido) {
         const slotId = `${slotEscolhido.psicologoId}_${slotEscolhido.data}_${slotEscolhido.hora}`;
         await updateDoc(doc(db, "disponibilidade", slotId), {
@@ -537,9 +581,10 @@
       document.getElementById("m-nome").value = "";
       document.getElementById("m-email").value = "";
       document.getElementById("m-telefone").value = "";
-      document.getElementById("m-data").value = "";
-      document.getElementById("m-hora").value = "";
       carregarHorariosDisponiveis();
+      if (slotEscolhido && tipo !== "Primeira consulta") {
+        carregarHorariosDoPsicologo(slotEscolhido.psicologoId);
+      }
     } catch (err) {
       console.error("Erro ao marcar consulta:", err);
       msg.style.color = "#b3452c";
