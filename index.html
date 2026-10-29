@@ -193,6 +193,7 @@
 <!-- Firebase -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app-check.js";
   import { getFirestore, enableIndexedDbPersistence, collection, getDocs, addDoc, updateDoc, doc, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
   import { getAuth } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 
@@ -206,6 +207,13 @@
   };
 
   const app = initializeApp(firebaseConfig);
+  // App Check (Fraud Defense / reCAPTCHA Enterprise) — protege os pedidos
+  // públicos (marcar consulta, lista de espera) contra scripts/bots,
+  // sem mostrar nenhum desafio a visitantes reais.
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider("6LfK2wYuAAAAAPkaH17v5ki8q0uFETzqMLW5k12Q"),
+    isTokenAutoRefreshEnabled: true,
+  });
   const db = getFirestore(app);
   // Ativa a cache offline do Firestore: se a ligação cair, os dados já
   // vistos continuam acessíveis e as escritas ficam em fila até haver rede.
