@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnóstico App Check | Essencialmente</title>
+<style>
+  body{
+    font-family:-apple-system, Arial, sans-serif;
+    max-width:700px;
+    margin:0 auto;
+    padding:20px;
+    background:#faf8f3;
+    color:#2b2b26;
+    line-height:1.5;
+  }
+  h1{ font-size:1.4rem; }
+  button{
+    display:block;
+    width:100%;
+    padding:16px;
+    margin:14px 0;
+    font-size:1.05rem;
+    border:none;
+    border-radius:8px;
+    background:#2d4327;
+    color:#fff;
+  }
+  button:disabled{ opacity:0.5; }
+  .resultado{
+    margin:10px 0 24px;
+    padding:14px;
+    border-radius:8px;
+    background:#fff;
+    border:1px solid #ddd;
+    white-space:pre-wrap;
+    word-break:break-word;
+    font-family:monospace;
+    font-size:0.85rem;
+  }
+  .ok{ border-color:#7a9b5c; background:#eef1e7; }
+  .erro{ border-color:#b3482f; background:#fbe9e5; }
+  p.aviso{ font-size:0.9rem; color:#6a6a60; }
+</style>
+</head>
+<body>
+
+<h1>Diagnóstico — App Check / Marcações</h1>
+<p class="aviso">Página só para testes. Podes apagar este ficheiro depois de resolvido o problema. O teste 2 cria uma entrada de teste na "Lista de espera" que podes apagar no painel admin.</p>
+
+<button id="btn1">1. Testar App Check (obter token)</button>
+<div id="res1" class="resultado">(ainda não testado)</div>
+
+<button id="btn2">2. Testar escrita na Lista de Espera</button>
+<div id="res2" class="resultado">(ainda não testado)</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app-check.js";
+  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBi-arHgDBIGpCCu50_yD3Yxz0reJtwuTs",
+    authDomain: "essencialmente-psicologia.firebaseapp.com",
+    projectId: "essencialmente-psicologia",
+    storageBucket: "essencialmente-psicologia.firebasestorage.app",
+    messagingSenderId: "908412673464",
+    appId: "1:908412673464:web:d838e6b1e8cc7a07ff434d"
+  };
+
+  const res1 = document.getElementById("res1");
+  const res2 = document.getElementById("res2");
+
+  function mostrar(el, texto, ok){
+    el.textContent = texto;
+    el.className = "resultado " + (ok ? "ok" : "erro");
+  }
+
+  let app, appCheck, db;
+  try {
+    app = initializeApp(firebaseConfig);
+    appCheck = initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider("6LfK2wYuAAAAAPkaH17v5ki8q0uFETzqMLW5k12Q"),
+      isTokenAutoRefreshEnabled: true,
+    });
+    db = getFirestore(app);
+  } catch (e) {
+    mostrar(res1, "Erro já ao iniciar o Firebase/App Check:\n" + (e && e.message ? e.message : e), false);
+  }
+
+  document.getElementById("btn1").addEventListener("click", async () => {
+    mostrar(res1, "A testar...", true);
+    try {
+      const resultado = await getToken(appCheck, true);
+      mostrar(res1, "SUCESSO — token obtido.\nPrimeiros caracteres: " + resultado.token.slice(0, 25) + "...", true);
+    } catch (e) {
+      mostrar(res1, "FALHOU.\nNome do erro: " + (e && e.name) + "\nMensagem: " + (e && e.message ? e.message : e), false);
+    }
+  });
+
+  document.getElementById("btn2").addEventListener("click", async () => {
+    mostrar(res2, "A testar...", true);
+    try {
+      const refDoc = await addDoc(collection(db, "listaEspera"), {
+        clienteNome: "TESTE DIAGNOSTICO (podes apagar)",
+        clienteEmail: "teste@teste.com",
+        clienteTelefone: "000000000",
+        tipo: "Teste",
+        notas: "Criado pela página de diagnóstico do App Check.",
+        visualizado: false,
+        criadoEm: serverTimestamp()
+      });
+      mostrar(res2, "SUCESSO — documento criado com id: " + refDoc.id + "\n(podes apagar na aba Lista de espera do admin)", true);
+    } catch (e) {
+      mostrar(res2, "FALHOU.\nCódigo: " + (e && e.code) + "\nMensagem: " + (e && e.message ? e.message : e), false);
+    }
+  });
+</script>
+</body>
+</html>
