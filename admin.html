@@ -190,9 +190,19 @@
       <b>Link da consulta:</b> <a id="d-link" href="#" target="_blank" rel="noopener" style="word-break:break-all;"></a>
     </div>
 
-    <!-- Edição da marcação — só visível para admin. Permite alterar o
-         psicólogo, a data/hora ou o estado, e cancelar a marcação. -->
+    <!-- Edição da marcação — só visível para admin. Permite corrigir os
+         contactos do cliente, alterar o psicólogo, a data/hora ou o
+         estado, e cancelar a marcação. -->
     <div id="bloco-editar-marcacao" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid #eee;">
+      <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Nome</label>
+      <input type="text" id="d-editar-nome" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem; margin-bottom:10px;">
+
+      <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Email</label>
+      <input type="email" id="d-editar-email" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem; margin-bottom:10px;">
+
+      <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Telefone</label>
+      <input type="tel" id="d-editar-telefone" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem; margin-bottom:14px;">
+
       <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Psicólogo</label>
       <select id="d-editar-psicologo" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem; margin-bottom:10px;">
         <option value="">Sem psicólogo atribuído</option>
@@ -792,6 +802,9 @@
     if (!linha) return;
     linha.children[0].textContent = c.data || "-";
     linha.children[1].textContent = c.hora || "-";
+    linha.children[2].textContent = c.clienteNome || "-";
+    linha.children[3].textContent = c.clienteEmail || "-";
+    linha.children[4].textContent = c.clienteTelefone || "-";
     linha.children[5].textContent = c.psicologoNome || "-";
     linha.children[7].innerHTML = `<span class="estado estado-${c.estado || "confirmada"}">${c.estado || "confirmada"}</span>`;
   }
@@ -801,6 +814,9 @@
     const msg = document.getElementById("msg-editar-marcacao");
     const c = window.consultasCache[consultaAtualId];
 
+    const novoNome = document.getElementById("d-editar-nome").value.trim();
+    const novoEmail = document.getElementById("d-editar-email").value.trim();
+    const novoTelefone = document.getElementById("d-editar-telefone").value.trim();
     const select = document.getElementById("d-editar-psicologo");
     const novoPsicologoId = select.value;
     const novoPsicologoNome = select.selectedOptions[0]?.textContent === "Sem psicólogo atribuído" ? "" : (select.selectedOptions[0]?.textContent || "");
@@ -808,17 +824,23 @@
     const novaHora = document.getElementById("d-editar-hora").value;
     const novoEstado = document.getElementById("d-editar-estado").value;
 
+    if (!novoNome || !novoEmail) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "O nome e o email não podem ficar vazios.";
+      return;
+    }
     if (!novaData || !novaHora) {
       msg.style.color = "#b3452c";
       msg.textContent = "Preenche a data e a hora.";
       return;
     }
 
+    const contactoMudou = novoNome !== (c.clienteNome || "") || novoEmail !== (c.clienteEmail || "") || novoTelefone !== (c.clienteTelefone || "");
     const psicologoMudou = novoPsicologoId !== (c.psicologoId || "");
     const dataHoraMudou = novaData !== c.data || novaHora !== c.hora;
     const estadoMudou = novoEstado !== (c.estado || "confirmada");
 
-    if (!psicologoMudou && !dataHoraMudou && !estadoMudou) {
+    if (!contactoMudou && !psicologoMudou && !dataHoraMudou && !estadoMudou) {
       msg.style.color = "var(--ink)";
       msg.textContent = "Sem alterações.";
       return;
@@ -829,6 +851,7 @@
 
     try {
       const updates = { estado: novoEstado };
+      if (contactoMudou) { updates.clienteNome = novoNome; updates.clienteEmail = novoEmail; updates.clienteTelefone = novoTelefone; }
       if (psicologoMudou) { updates.psicologoId = novoPsicologoId; updates.psicologoNome = novoPsicologoNome; }
       if (dataHoraMudou) { updates.data = novaData; updates.hora = novaHora; }
       await updateDoc(doc(db, "consultas", consultaAtualId), updates);
@@ -857,6 +880,9 @@
 
       Object.assign(c, updates);
       window.consultasCache[consultaAtualId] = c;
+      document.getElementById("d-nome").textContent = c.clienteNome || "-";
+      document.getElementById("d-email").textContent = c.clienteEmail || "-";
+      document.getElementById("d-telefone").textContent = c.clienteTelefone || "-";
       document.getElementById("d-psicologo").textContent = c.psicologoNome || "-";
       document.getElementById("d-datahora").textContent = `${c.data} às ${c.hora}`;
       document.getElementById("d-estado").textContent = c.estado || "confirmada";
@@ -1141,6 +1167,10 @@
     const blocoEditar = document.getElementById("bloco-editar-marcacao");
     document.getElementById("msg-editar-marcacao").textContent = "";
     if (window.papelAtual === "admin") {
+      document.getElementById("d-editar-nome").value = c.clienteNome || "";
+      document.getElementById("d-editar-email").value = c.clienteEmail || "";
+      document.getElementById("d-editar-telefone").value = c.clienteTelefone || "";
+
       const select = document.getElementById("d-editar-psicologo");
       select.innerHTML = '<option value="">Sem psicólogo atribuído</option>';
       listaPsicologosParaAtribuir.forEach(p => {
