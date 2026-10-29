@@ -323,6 +323,12 @@
 
   btnSair.addEventListener("click", () => signOut(auth));
 
+  // Admin tem sempre todas as permissões; um psicólogo só tem as que lhe
+  // foram atribuídas em psicologos/{uid}.permissoes.
+  function temPermissao(chave) {
+    return window.papelAtual === "admin" || !!(window.minhasPermissoes && window.minhasPermissoes[chave]);
+  }
+
   // ---- Separadores do painel (Agenda / Consultas / Psicólogos / Tipos / Backup) ----
   function mostrarAba(nome) {
     document.querySelectorAll(".aba-conteudo").forEach(el => {
@@ -371,32 +377,36 @@
     painel.classList.add("ativo");
     btnSair.style.display = "inline-block";
 
-    document.getElementById("resumo-utilizador").textContent =
-      role === "admin"
-        ? `Sessão de administrador (${perfil.nome || user.email}) — a ver todas as consultas.`
-        : `Sessão de ${perfil.nome || user.email} — a ver as tuas consultas.`;
-
-    // As secções só-admin (Psicólogos, Tipos de consulta, Backup) só
-    // aparecem como separadores para quem é admin; Agenda e Consultas são
-    // visíveis para todos.
-    document.querySelectorAll(".admin-tab-btn.so-admin").forEach(btn => {
-      btn.style.display = role === "admin" ? "inline-block" : "none";
-    });
-    mostrarAba("agenda");
     window.papelAtual = role;
     window.meuUid = user.uid;
     window.meuNome = perfil.nome || user.email;
+    // Permissões extra de um psicólogo (não-admin), atribuídas pelo admin
+    // na lista "Psicólogos existentes". Admin tem sempre tudo — ver
+    // temPermissao().
+    window.minhasPermissoes = perfil.permissoes || {};
+
+    document.getElementById("resumo-utilizador").textContent =
+      role === "admin"
+        ? `Sessão de administrador (${perfil.nome || user.email}) — a ver todas as consultas.`
+        : temPermissao("verTodasConsultas")
+          ? `Sessão de ${perfil.nome || user.email} — a ver todas as consultas.`
+          : `Sessão de ${perfil.nome || user.email} — a ver as tuas consultas.`;
+
+    // "Psicólogos" é sempre só-admin. "Tipos de consulta" e "Backup"
+    // aparecem também para quem tiver a permissão correspondente.
+    document.querySelector('.admin-tab-btn[data-aba="psicologos"]').style.display = role === "admin" ? "inline-block" : "none";
+    document.querySelector('.admin-tab-btn[data-aba="tipos"]').style.display = temPermissao("giretipos") ? "inline-block" : "none";
+    document.querySelector('.admin-tab-btn[data-aba="backup"]').style.display = temPermissao("exportarBackup") ? "inline-block" : "none";
+    mostrarAba("agenda");
 
     await carregarListaPsicologosParaAtribuir();
-    if (role === "admin") {
-      carregarListaGerirPsicologos();
-      carregarListaTiposConsulta();
-    }
+    if (role === "admin") carregarListaGerirPsicologos();
+    if (temPermissao("giretipos")) carregarListaTiposConsulta();
 
     // Carregamos as consultas primeiro (preenche window.consultasCache com
     // os nomes dos clientes) antes de desenhar a agenda, que precisa desse
     // cache para mostrar o nome em cada hora reservada.
-    await carregarConsultas(role, user.uid);
+    await carregarConsultas(user.uid);
     carregarAgenda();
   });
 
@@ -459,6 +469,7 @@
           nome: docSnap.data().nome || "Sem nome",
           role: docSnap.data().role || "psicologo",
           atendePrimeiraConsulta: !!docSnap.data().atendePrimeiraConsulta,
+          permissoes: docSnap.data().permissoes || {},
         });
       });
     } catch (err) {
@@ -466,7 +477,18 @@
     }
   }
 
-  // ---- Gerir psicólogos (listar / apagar / definir quem atende Primeira consulta) ----
+  // ---- Gerir psicólogos (listar / apagar / definir quem atende Primeira
+  // consulta / atribuir permissões extra da área de admin) ----
+
+  // Permissões que um psicólogo (não-admin) pode receber — cada uma dá
+  // acesso a uma parte da área de admin que, por omissão, só o admin vê.
+  // "Gerir psicólogos" fica sempre de fora de propósito: quem a tivesse
+  // podia criar contas novas e atribuir-se a si mesmo mais permissões.
+  const PERMISSOES_ATRIBUIVEIS = [
+    { chave: "verTodasConsultas", label: "Ver/gerir todas as consultas" },
+    { chave: "giretipos", label: "Gerir tipos de consulta" },
+    { chave: "exportarBackup", label: "Exportar backup" },
+  ];
 
   function carregarListaGerirPsicologos() {
     const container = document.getElementById("lista-gerir-psicologos");
@@ -478,18 +500,38 @@
     container.innerHTML = "";
     listaPsicologosParaAtribuir.forEach(p => {
       const linha = document.createElement("div");
-      linha.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:var(--sage-light); border-radius:6px; font-size:0.85rem; gap:8px;";
+      linha.style.cssText = "padding:10px; background:var(--sage-light); border-radius:6px; font-size:0.85rem;";
+
+      const permissoesHtml = p.role === "admin"
+        ? ""
+        : PERMISSOES_ATRIBUIVEIS.map(perm => `
+            <label style="display:flex; align-items:center; gap:5px; font-size:0.76rem; cursor:pointer;">
+              <input type="checkbox" data-permissao-id="${p.id}" data-permissao-chave="${perm.chave}" ${p.permissoes[perm.chave] ? "checked" : ""}>
+              ${perm.label}
+            </label>
+          `).join("");
+
       linha.innerHTML = `
-        <span>${p.nome} ${p.role === "admin" ? "<b style='color:var(--forest);'>(admin)</b>" : ""}</span>
-        <label style="display:flex; align-items:center; gap:5px; font-size:0.78rem; cursor:pointer;">
-          <input type="checkbox" data-toggle-id="${p.id}" ${p.atendePrimeiraConsulta ? "checked" : ""}>
-          1ª consulta
-        </label>
-        <button data-id="${p.id}" data-nome="${p.nome}" style="background:none; border:none; color:#b3452c; cursor:pointer; font-size:0.8rem;">Remover</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
+          <span>${p.nome} ${p.role === "admin" ? "<b style='color:var(--forest);'>(admin)</b>" : ""}</span>
+          <button data-id="${p.id}" data-nome="${p.nome}" style="background:none; border:none; color:#b3452c; cursor:pointer; font-size:0.8rem;">Remover</button>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:6px 14px;">
+          <label style="display:flex; align-items:center; gap:5px; font-size:0.76rem; cursor:pointer;">
+            <input type="checkbox" data-toggle-id="${p.id}" ${p.atendePrimeiraConsulta ? "checked" : ""}>
+            1ª consulta
+          </label>
+          ${permissoesHtml}
+        </div>
       `;
       linha.querySelector("button").addEventListener("click", () => removerPsicologo(p.id, p.nome));
-      linha.querySelector("input[type=checkbox]").addEventListener("change", (e) => {
+      linha.querySelector("input[data-toggle-id]").addEventListener("change", (e) => {
         alternarAtendePrimeiraConsulta(p.id, e.target.checked);
+      });
+      linha.querySelectorAll("input[data-permissao-chave]").forEach(input => {
+        input.addEventListener("change", (e) => {
+          alternarPermissao(p.id, e.target.dataset.permissaoChave, e.target.checked);
+        });
       });
       container.appendChild(linha);
     });
@@ -502,6 +544,18 @@
       if (p) p.atendePrimeiraConsulta = valor;
     } catch (err) {
       console.error("Erro ao atualizar:", err);
+      alert("Não foi possível guardar: " + err.message);
+      carregarListaGerirPsicologos();
+    }
+  }
+
+  async function alternarPermissao(id, chave, valor) {
+    try {
+      await updateDoc(doc(db, "psicologos", id), { [`permissoes.${chave}`]: valor });
+      const p = listaPsicologosParaAtribuir.find(x => x.id === id);
+      if (p) p.permissoes[chave] = valor;
+    } catch (err) {
+      console.error("Erro ao atualizar permissão:", err);
       alert("Não foi possível guardar: " + err.message);
       carregarListaGerirPsicologos();
     }
@@ -695,7 +749,7 @@
     // Não limpamos a grelha aqui — mantemos o conteúdo anterior visível até
     // os novos dados chegarem, para evitar o "apagão" ao mudar de dia.
 
-    const psicologosAVer = window.papelAtual === "admin"
+    const psicologosAVer = temPermissao("verTodasConsultas")
       ? listaPsicologosParaAtribuir
       : listaPsicologosParaAtribuir.filter(p => p.id === window.meuUid);
 
@@ -752,8 +806,8 @@
     const psicologoId = cel.dataset.psicologo;
     const hora = cel.dataset.hora;
 
-    // Só pode mexer na própria coluna, exceto se for admin
-    if (window.papelAtual !== "admin" && psicologoId !== window.meuUid) return;
+    // Só pode mexer na própria coluna, exceto se tiver permissão para ver/gerir todas
+    if (!temPermissao("verTodasConsultas") && psicologoId !== window.meuUid) return;
 
     if (cel.classList.contains("reservado")) {
       const consultaId = cel.dataset.consultaId;
@@ -1116,13 +1170,13 @@
     abrirLink(`mailto:${encodeURIComponent(c.clienteEmail)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
   });
 
-  async function carregarConsultas(role, psicologoId) {
+  async function carregarConsultas(psicologoId) {
     const corpo = document.getElementById("lista-consultas");
     const vazio = document.getElementById("vazio");
     corpo.innerHTML = "";
 
     let consultasQuery;
-    if (role === "admin") {
+    if (temPermissao("verTodasConsultas")) {
       consultasQuery = query(collection(db, "consultas"), orderBy("data", "desc"));
     } else {
       consultasQuery = query(collection(db, "consultas"), where("psicologoId", "==", psicologoId), orderBy("data", "desc"));
@@ -1191,11 +1245,12 @@
       linhaLink.style.display = "none";
     }
 
-    // Bloco de edição da marcação — só para admin: permite alterar o
-    // psicólogo, a data/hora ou o estado, e cancelar a marcação.
+    // Bloco de edição da marcação — admin, ou psicólogo com permissão de
+    // ver todas as consultas: permite alterar o psicólogo, a data/hora ou
+    // o estado, e cancelar a marcação.
     const blocoEditar = document.getElementById("bloco-editar-marcacao");
     document.getElementById("msg-editar-marcacao").textContent = "";
-    if (window.papelAtual === "admin") {
+    if (temPermissao("verTodasConsultas")) {
       document.getElementById("d-editar-nome").value = c.clienteNome || "";
       document.getElementById("d-editar-email").value = c.clienteEmail || "";
       document.getElementById("d-editar-telefone").value = c.clienteTelefone || "";
