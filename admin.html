@@ -198,6 +198,14 @@
   <div id="bloco-backup" class="aba-conteudo" data-aba="backup" style="display:none; margin-bottom:24px;">
     <button id="btn-exportar-backup" style="padding:10px 18px; background:none; border:1px solid var(--forest); color:var(--forest); border-radius:6px; cursor:pointer; font-size:0.9rem;">Exportar backup (JSON)</button>
     <p id="msg-backup" style="font-size:0.82rem; margin-top:8px;"></p>
+
+    <div id="bloco-migrar-contactos" style="display:none; margin-top:22px; padding-top:16px; border-top:1px solid #e7e3d9; max-width:460px;">
+      <p style="font-size:0.82rem; color:#888; margin-bottom:10px;">
+        Ferramenta única: move o nome/email/telefone dos clientes das marcações antigas para um local protegido, só acessível a administradores (ou a quem tiver a permissão "Ver todas as consultas"). Podes correr isto mais do que uma vez sem problema — marcações já migradas são ignoradas.
+      </p>
+      <button id="btn-migrar-contactos" style="padding:10px 18px; background:none; border:1px solid var(--forest); color:var(--forest); border-radius:6px; cursor:pointer; font-size:0.9rem;">Migrar dados de contacto antigos</button>
+      <p id="msg-migrar-contactos" style="font-size:0.82rem; margin-top:8px;"></p>
+    </div>
   </div>
 
   <div id="bloco-conta" class="aba-conteudo" data-aba="conta" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px; max-width:420px;">
@@ -303,7 +311,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app-check.js";
-  import { getFirestore, enableIndexedDbPersistence, collection, getDocs, addDoc, setDoc, deleteDoc, doc, getDoc, updateDoc, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getFirestore, enableIndexedDbPersistence, collection, getDocs, addDoc, setDoc, deleteDoc, deleteField, doc, getDoc, updateDoc, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
   import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-functions.js";
 
@@ -521,6 +529,7 @@
     document.querySelector('.admin-tab-btn[data-aba="espera"]').style.display = temPermissao("verTodasConsultas") ? "inline-block" : "none";
     document.querySelector('.admin-tab-btn[data-aba="tipos"]').style.display = temPermissao("giretipos") ? "inline-block" : "none";
     document.querySelector('.admin-tab-btn[data-aba="backup"]').style.display = temPermissao("exportarBackup") ? "inline-block" : "none";
+    document.getElementById("bloco-migrar-contactos").style.display = role === "admin" ? "block" : "none";
     mostrarAba("agenda");
 
     await carregarListaPsicologosParaAtribuir();
@@ -977,10 +986,12 @@
         psicologosAVer.forEach(p => {
           const s = mapa[`${p.id}|${hora}`];
           if (s && s.reservado) {
-            // O nome do cliente já não vem da coleção pública "disponibilidade"
-            // (evita expor dados de clientes sem autenticação) — vamos buscá-lo
-            // à coleção protegida "consultas", já carregada em cache.
-            const nomeCliente = window.consultasCache[s.consultaId]?.clienteNome || "Reservado";
+            // O nome do cliente só aparece aqui para quem tem permissão de ver
+            // dados de contacto — um psicólogo sem essa permissão vê sempre
+            // "Reservado", mesmo nas suas próprias consultas.
+            const nomeCliente = temPermissao("verTodasConsultas")
+              ? (window.consultasCache[s.consultaId]?.clienteNome || "Reservado")
+              : "Reservado";
             html += `<td class="agenda-cell reservado" data-psicologo="${p.id}" data-hora="${hora}" data-consulta-id="${s.consultaId || ""}">${escapeHtml(nomeCliente)}</td>`;
           } else if (s) {
             html += `<td class="agenda-cell livre" data-psicologo="${p.id}" data-hora="${hora}" data-psicologo-nome="${escapeHtml(p.nome)}">Livre</td>`;
@@ -1084,11 +1095,12 @@
   function atualizarLinhaConsulta(id, c) {
     const linha = document.querySelector(`tr[data-id="${id}"]`);
     if (!linha) return;
+    const podeVerContacto = temPermissao("verTodasConsultas");
     linha.children[0].textContent = c.data || "-";
     linha.children[1].textContent = c.hora || "-";
-    linha.children[2].textContent = c.clienteNome || "-";
-    linha.children[3].textContent = c.clienteEmail || "-";
-    linha.children[4].textContent = c.clienteTelefone || "-";
+    linha.children[2].textContent = podeVerContacto ? (c.clienteNome || "-") : "🔒";
+    linha.children[3].textContent = podeVerContacto ? (c.clienteEmail || "-") : "-";
+    linha.children[4].textContent = podeVerContacto ? (c.clienteTelefone || "-") : "-";
     linha.children[5].textContent = c.psicologoNome || "-";
     linha.children[7].innerHTML = `<span class="estado estado-${c.estado || "confirmada"}">${c.estado || "confirmada"}</span>`;
   }
@@ -1135,10 +1147,15 @@
 
     try {
       const updates = { estado: novoEstado };
-      if (contactoMudou) { updates.clienteNome = novoNome; updates.clienteEmail = novoEmail; updates.clienteTelefone = novoTelefone; }
       if (psicologoMudou) { updates.psicologoId = novoPsicologoId; updates.psicologoNome = novoPsicologoNome; }
       if (dataHoraMudou) { updates.data = novaData; updates.hora = novaHora; }
       await updateDoc(doc(db, "consultas", consultaAtualId), updates);
+      if (contactoMudou) {
+        await setDoc(doc(db, "consultas", consultaAtualId, "privado", "dados"), {
+          clienteNome: novoNome, clienteEmail: novoEmail, clienteTelefone: novoTelefone,
+        }, { merge: true });
+        updates.clienteNome = novoNome; updates.clienteEmail = novoEmail; updates.clienteTelefone = novoTelefone;
+      }
 
       // Se mudou o psicólogo e/ou a data/hora, atualiza os slots de
       // disponibilidade: liberta o antigo (se ainda for desta consulta) e
@@ -1383,14 +1400,20 @@
       consultasQuery = query(collection(db, "consultas"), where("psicologoId", "==", psicologoId), orderBy("data", "desc"));
     }
 
+    const podeVerContacto = temPermissao("verTodasConsultas");
+
     try {
       const snap = await getDocs(consultasQuery);
       if (snap.empty) {
         vazio.style.display = "block";
         return;
       }
-      snap.forEach(docSnap => {
+      for (const docSnap of snap.docs) {
         const c = docSnap.data();
+        if (podeVerContacto) {
+          const contacto = await carregarContactoCliente(docSnap.id);
+          if (contacto) Object.assign(c, contacto);
+        }
         window.consultasCache[docSnap.id] = c;
 
         const tr = document.createElement("tr");
@@ -1400,16 +1423,16 @@
         tr.innerHTML = `
           <td>${escapeHtml(c.data) || "-"}</td>
           <td>${escapeHtml(c.hora) || "-"}</td>
-          <td>${naoVista ? '<span class="badge-novo"></span>' : ''}${escapeHtml(c.clienteNome) || "-"}</td>
-          <td>${escapeHtml(c.clienteEmail) || "-"}</td>
-          <td>${escapeHtml(c.clienteTelefone) || "-"}</td>
+          <td>${naoVista ? '<span class="badge-novo"></span>' : ''}${podeVerContacto ? (escapeHtml(c.clienteNome) || "-") : "🔒"}</td>
+          <td>${podeVerContacto ? (escapeHtml(c.clienteEmail) || "-") : "-"}</td>
+          <td>${podeVerContacto ? (escapeHtml(c.clienteTelefone) || "-") : "-"}</td>
           <td>${escapeHtml(c.psicologoNome) || "-"}</td>
           <td>${escapeHtml(c.tipo) || "-"}</td>
           <td><span class="estado estado-${c.estado || "confirmada"}">${c.estado || "confirmada"}</span></td>
         `;
         tr.addEventListener("click", () => abrirDetalhes(docSnap.id));
         corpo.appendChild(tr);
-      });
+      }
     } catch (err) {
       console.error("Erro ao carregar consultas:", err);
       vazio.textContent = "Não foi possível carregar as consultas.";
@@ -1420,14 +1443,29 @@
   window.consultasCache = {};
   let consultaAtualId = null;
 
+  // Nome/email/telefone do cliente vivem à parte, em consultas/{id}/privado/dados,
+  // só legíveis por quem tem permissão de ver dados de contacto (admin, ou
+  // psicólogo com "Ver todas as consultas") — um psicólogo normal nem tenta
+  // ler isto, para nunca ficar com os contactos dos seus próprios clientes.
+  async function carregarContactoCliente(consultaId) {
+    try {
+      const snap = await getDoc(doc(db, "consultas", consultaId, "privado", "dados"));
+      return snap.exists() ? snap.data() : null;
+    } catch (err) {
+      console.warn("Sem acesso aos dados de contacto desta consulta:", err.code);
+      return null;
+    }
+  }
+
   async function abrirDetalhes(id) {
     const c = window.consultasCache[id];
     if (!c) return;
     consultaAtualId = id;
+    const podeVerContacto = temPermissao("verTodasConsultas");
 
-    document.getElementById("d-nome").textContent = c.clienteNome || "-";
-    document.getElementById("d-email").textContent = c.clienteEmail || "-";
-    document.getElementById("d-telefone").textContent = c.clienteTelefone || "-";
+    document.getElementById("d-nome").textContent = podeVerContacto ? (c.clienteNome || "-") : "Só visível para administradores";
+    document.getElementById("d-email").textContent = podeVerContacto ? (c.clienteEmail || "-") : "-";
+    document.getElementById("d-telefone").textContent = podeVerContacto ? (c.clienteTelefone || "-") : "-";
     document.getElementById("d-psicologo").textContent = c.psicologoNome || "-";
     document.getElementById("d-tipo").textContent = c.tipo || "-";
     document.getElementById("d-datahora").textContent = `${c.data || "-"} às ${c.hora || "-"}`;
@@ -1513,6 +1551,46 @@
     }
   });
 
+  // ---- Migrar contactos antigos (admin) ----
+  // Marcações feitas antes desta proteção têm o nome/email/telefone do
+  // cliente guardados diretamente no documento de "consultas" — o que um
+  // psicólogo com acesso a essa consulta já conseguia ler. Esta ferramenta
+  // move esses três campos para a subcoleção protegida e remove-os do
+  // documento principal. Documentos já migrados (sem estes campos) são
+  // ignorados, por isso é seguro correr mais do que uma vez.
+  document.getElementById("btn-migrar-contactos").addEventListener("click", async () => {
+    const msg = document.getElementById("msg-migrar-contactos");
+    if (!confirm('Mover os dados de contacto das marcações antigas para o local protegido?\n\nNão apaga nada, só reorganiza.')) return;
+
+    msg.style.color = "var(--ink)";
+    msg.textContent = "A migrar...";
+    try {
+      const snap = await getDocs(collection(db, "consultas"));
+      let migradas = 0;
+      for (const docSnap of snap.docs) {
+        const c = docSnap.data();
+        if (c.clienteNome === undefined && c.clienteEmail === undefined && c.clienteTelefone === undefined) continue;
+        await setDoc(doc(db, "consultas", docSnap.id, "privado", "dados"), {
+          clienteNome: c.clienteNome || "",
+          clienteEmail: c.clienteEmail || "",
+          clienteTelefone: c.clienteTelefone || "",
+        }, { merge: true });
+        await updateDoc(doc(db, "consultas", docSnap.id), {
+          clienteNome: deleteField(),
+          clienteEmail: deleteField(),
+          clienteTelefone: deleteField(),
+        });
+        migradas++;
+      }
+      msg.style.color = "#3c5a2f";
+      msg.textContent = migradas > 0 ? `Concluído — ${migradas} marcação(ões) migradas.` : "Nada para migrar — já estava tudo no local protegido.";
+    } catch (err) {
+      console.error("Erro ao migrar contactos:", err);
+      msg.style.color = "#b3452c";
+      msg.textContent = "Erro: " + err.message;
+    }
+  });
+
   // ---- Exportar backup (admin) ----
   // Junta consultas, agenda (disponibilidade) e psicólogos num único ficheiro
   // JSON descarregável — uma cópia offline dos dados, independente do Firebase.
@@ -1531,9 +1609,20 @@
 
       const paraArray = (snap) => snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+      // Dados de contacto do cliente vivem à parte (consultas/{id}/privado/dados)
+      // — só os juntamos ao backup se quem exporta tiver mesmo permissão para
+      // os ler (a leitura falha sozinha, por utilizador, se não tiver).
+      const consultasArray = paraArray(snapConsultas);
+      if (temPermissao("verTodasConsultas")) {
+        await Promise.all(consultasArray.map(async (c) => {
+          const contacto = await carregarContactoCliente(c.id);
+          if (contacto) Object.assign(c, contacto);
+        }));
+      }
+
       const backup = {
         exportadoEm: new Date().toISOString(),
-        consultas: paraArray(snapConsultas),
+        consultas: consultasArray,
         disponibilidade: paraArray(snapDisponibilidade),
         psicologos: paraArray(snapPsicologos),
       };
