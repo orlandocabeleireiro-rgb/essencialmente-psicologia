@@ -337,6 +337,22 @@
 
   btnSair.addEventListener("click", () => signOut(auth));
 
+  // Escapa texto antes de o inserir em innerHTML — essencial para qualquer
+  // valor que venha de fora (nome/email/telefone/notas de clientes, vindos
+  // do site público sem autenticação), para não correr como HTML/script.
+  // Só deixa o link da consulta ser clicável se for http(s) — evita que um
+  // valor tipo "javascript:..." (escrito por engano ou de propósito no
+  // campo do link) corra código ao ser clicado.
+  function linkEhSeguro(url) {
+    return /^https?:\/\//i.test(url || "");
+  }
+
+  function escapeHtml(valor) {
+    return String(valor ?? "").replace(/[&<>"']/g, ch => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[ch]));
+  }
+
   // Admin tem sempre todas as permissões; um psicólogo só tem as que lhe
   // foram atribuídas em psicologos/{uid}.permissoes.
   function temPermissao(chave) {
@@ -560,8 +576,8 @@
 
       linha.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
-          <span>${p.nome} ${p.role === "admin" ? "<b style='color:var(--forest);'>(admin)</b>" : ""}</span>
-          <button data-id="${p.id}" data-nome="${p.nome}" style="background:none; border:none; color:#b3452c; cursor:pointer; font-size:0.8rem;">Remover</button>
+          <span>${escapeHtml(p.nome)} ${p.role === "admin" ? "<b style='color:var(--forest);'>(admin)</b>" : ""}</span>
+          <button data-id="${p.id}" style="background:none; border:none; color:#b3452c; cursor:pointer; font-size:0.8rem;">Remover</button>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:6px 14px;">
           <label style="display:flex; align-items:center; gap:5px; font-size:0.76rem; cursor:pointer;">
@@ -654,7 +670,7 @@
       const linha = document.createElement("div");
       linha.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:var(--sage-light); border-radius:6px; font-size:0.85rem; gap:8px;";
       linha.innerHTML = `
-        <span>${t.nome}</span>
+        <span>${escapeHtml(t.nome)}</span>
         <span style="display:flex; gap:10px;">
           <button data-acao="editar" style="background:none; border:none; color:var(--teal-text); cursor:pointer; font-size:0.8rem;">Editar</button>
           <button data-acao="remover" style="background:none; border:none; color:#b3452c; cursor:pointer; font-size:0.8rem;">Remover</button>
@@ -758,11 +774,11 @@
         linha.style.cssText = "padding:12px; background:var(--sage-light); border-radius:6px; font-size:0.88rem;";
         linha.innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:6px;">
-            <b style="color:var(--teal-text);">${!p.visualizado ? '<span class="badge-novo"></span>' : ''}${p.clienteNome || "Sem nome"}</b>
+            <b style="color:var(--teal-text);">${!p.visualizado ? '<span class="badge-novo"></span>' : ''}${escapeHtml(p.clienteNome) || "Sem nome"}</b>
             <button data-id="${docSnap.id}" style="background:none; border:none; color:#b3452c; cursor:pointer; font-size:0.8rem; white-space:nowrap;">Remover</button>
           </div>
-          <div>${p.clienteEmail || "-"} ${p.clienteTelefone ? "· " + p.clienteTelefone : ""}</div>
-          ${p.notas ? `<div style="margin-top:4px; color:#5c5c52;">"${p.notas}"</div>` : ""}
+          <div>${escapeHtml(p.clienteEmail) || "-"} ${p.clienteTelefone ? "· " + escapeHtml(p.clienteTelefone) : ""}</div>
+          ${p.notas ? `<div style="margin-top:4px; color:#5c5c52;">"${escapeHtml(p.notas)}"</div>` : ""}
           ${dataPedido ? `<div style="margin-top:4px; font-size:0.76rem; color:#888;">Pedido em ${dataPedido}</div>` : ""}
         `;
         linha.querySelector("button").addEventListener("click", () => removerPedidoEspera(docSnap.id));
@@ -901,11 +917,11 @@
             // (evita expor dados de clientes sem autenticação) — vamos buscá-lo
             // à coleção protegida "consultas", já carregada em cache.
             const nomeCliente = window.consultasCache[s.consultaId]?.clienteNome || "Reservado";
-            html += `<td class="agenda-cell reservado" data-psicologo="${p.id}" data-hora="${hora}" data-consulta-id="${s.consultaId || ""}">${nomeCliente}</td>`;
+            html += `<td class="agenda-cell reservado" data-psicologo="${p.id}" data-hora="${hora}" data-consulta-id="${s.consultaId || ""}">${escapeHtml(nomeCliente)}</td>`;
           } else if (s) {
-            html += `<td class="agenda-cell livre" data-psicologo="${p.id}" data-hora="${hora}" data-psicologo-nome="${p.nome}">Livre</td>`;
+            html += `<td class="agenda-cell livre" data-psicologo="${p.id}" data-hora="${hora}" data-psicologo-nome="${escapeHtml(p.nome)}">Livre</td>`;
           } else {
-            html += `<td class="agenda-cell fechado" data-psicologo="${p.id}" data-hora="${hora}" data-psicologo-nome="${p.nome}"></td>`;
+            html += `<td class="agenda-cell fechado" data-psicologo="${p.id}" data-hora="${hora}" data-psicologo-nome="${escapeHtml(p.nome)}"></td>`;
           }
         });
         html += "</tr>";
@@ -1155,7 +1171,7 @@
       const linkEl = document.getElementById("d-link");
       if (link) {
         linkEl.textContent = link;
-        linkEl.href = link;
+        linkEl.href = linkEhSeguro(link) ? link : "#";
         linhaLink.style.display = "block";
       } else {
         linhaLink.style.display = "none";
@@ -1318,13 +1334,13 @@
         tr.dataset.id = docSnap.id;
         const naoVista = !c.visualizada;
         tr.innerHTML = `
-          <td>${c.data || "-"}</td>
-          <td>${c.hora || "-"}</td>
-          <td>${naoVista ? '<span class="badge-novo"></span>' : ''}${c.clienteNome || "-"}</td>
-          <td>${c.clienteEmail || "-"}</td>
-          <td>${c.clienteTelefone || "-"}</td>
-          <td>${c.psicologoNome || "-"}</td>
-          <td>${c.tipo || "-"}</td>
+          <td>${escapeHtml(c.data) || "-"}</td>
+          <td>${escapeHtml(c.hora) || "-"}</td>
+          <td>${naoVista ? '<span class="badge-novo"></span>' : ''}${escapeHtml(c.clienteNome) || "-"}</td>
+          <td>${escapeHtml(c.clienteEmail) || "-"}</td>
+          <td>${escapeHtml(c.clienteTelefone) || "-"}</td>
+          <td>${escapeHtml(c.psicologoNome) || "-"}</td>
+          <td>${escapeHtml(c.tipo) || "-"}</td>
           <td><span class="estado estado-${c.estado || "confirmada"}">${c.estado || "confirmada"}</span></td>
         `;
         tr.addEventListener("click", () => abrirDetalhes(docSnap.id));
@@ -1360,7 +1376,7 @@
     const linkEl = document.getElementById("d-link");
     if (c.linkConsulta) {
       linkEl.textContent = c.linkConsulta;
-      linkEl.href = c.linkConsulta;
+      linkEl.href = linkEhSeguro(c.linkConsulta) ? c.linkConsulta : "#";
       linhaLink.style.display = "block";
     } else {
       linhaLink.style.display = "none";
