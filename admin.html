@@ -131,6 +131,12 @@
   </div>
 
   <div class="aba-conteudo" data-aba="consultas" style="display:none;">
+    <div id="bloco-proximas-consultas" style="margin-bottom:28px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:20px; max-width:640px;">
+      <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:14px; font-size:1.05rem;">Próximas consultas</h3>
+      <div id="lista-proximas-consultas" style="display:flex; flex-direction:column; gap:8px;"></div>
+      <p id="vazio-proximas" style="font-size:0.85rem; color:#888; display:none;">Sem consultas marcadas para os próximos dias.</p>
+    </div>
+
     <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; color:#5c5c52; margin-bottom:14px; cursor:pointer;">
       <input type="checkbox" id="chk-mostrar-canceladas">
       Mostrar também as marcações canceladas
@@ -1388,6 +1394,50 @@
     abrirLink(`mailto:${encodeURIComponent(c.clienteEmail)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
   });
 
+  // Data/hora atuais, no mesmo formato guardado nos documentos — usadas
+  // para decidir o que ainda está para acontecer.
+  function dataHojeStr() {
+    const agora = new Date();
+    return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}-${String(agora.getDate()).padStart(2, "0")}`;
+  }
+  function horaAgoraStr() {
+    const agora = new Date();
+    return `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`;
+  }
+
+  // "Próximas consultas" — mostra, à parte da tabela completa, só as que
+  // ainda vão acontecer (não canceladas), da mais próxima para a mais
+  // distante. Usa o mesmo conjunto de dados já carregado por
+  // carregarConsultas, sem precisar de outra pesquisa ao Firestore.
+  function renderProximasConsultas(todasConsultas) {
+    const container = document.getElementById("lista-proximas-consultas");
+    const vazio = document.getElementById("vazio-proximas");
+    const agoraChave = dataHojeStr() + horaAgoraStr();
+
+    const proximas = todasConsultas
+      .filter(({ c }) => c.estado !== "cancelada" && `${c.data || ""}${c.hora || ""}` > agoraChave)
+      .sort((a, b) => (a.c.data + a.c.hora).localeCompare(b.c.data + b.c.hora));
+
+    container.innerHTML = "";
+    if (proximas.length === 0) {
+      vazio.style.display = "block";
+      return;
+    }
+    vazio.style.display = "none";
+
+    proximas.forEach(({ id, c }) => {
+      const [ano, mes, dia] = (c.data || "").split("-");
+      const linha = document.createElement("div");
+      linha.style.cssText = "padding:10px 12px; background:var(--sage-light); border-radius:6px; font-size:0.88rem; cursor:pointer; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;";
+      linha.innerHTML = `
+        <span><b style="color:var(--teal-text);">${dia}/${mes}/${ano} às ${c.hora || "-"}</b> — ${escapeHtml(c.clienteNome) || "-"} (${escapeHtml(c.tipo) || "-"})</span>
+        <span style="color:#888;">${escapeHtml(c.psicologoNome) || "-"}</span>
+      `;
+      linha.addEventListener("click", () => abrirDetalhes(id));
+      container.appendChild(linha);
+    });
+  }
+
   async function carregarConsultas(psicologoId) {
     const corpo = document.getElementById("lista-consultas");
     const vazio = document.getElementById("vazio");
@@ -1409,22 +1459,35 @@
       if (snap.empty) {
         vazio.textContent = "Ainda não há consultas marcadas.";
         vazio.style.display = "block";
+        renderProximasConsultas([]);
         return;
       }
-      let algumaLinha = false;
+
+      // Carrega e guarda em cache todos os documentos primeiro (incluindo
+      // canceladas, mesmo que fiquem escondidas da tabela principal) — a
+      // secção "Próximas consultas" usa este mesmo conjunto, sem precisar
+      // de outra pesquisa ao Firestore.
+      const todasConsultas = [];
       for (const docSnap of snap.docs) {
         const c = docSnap.data();
-        if (c.estado === "cancelada" && !mostrarCanceladas) continue;
-        algumaLinha = true;
         if (podeVerContacto) {
           const contacto = await carregarContactoCliente(docSnap.id);
           if (contacto) Object.assign(c, contacto);
         }
         window.consultasCache[docSnap.id] = c;
+        todasConsultas.push({ id: docSnap.id, c });
+      }
+
+      renderProximasConsultas(todasConsultas);
+
+      let algumaLinha = false;
+      todasConsultas.forEach(({ id, c }) => {
+        if (c.estado === "cancelada" && !mostrarCanceladas) return;
+        algumaLinha = true;
 
         const tr = document.createElement("tr");
         tr.className = "linha-consulta";
-        tr.dataset.id = docSnap.id;
+        tr.dataset.id = id;
         const naoVista = !c.visualizada;
         tr.innerHTML = `
           <td>${escapeHtml(c.data) || "-"}</td>
@@ -1436,9 +1499,9 @@
           <td>${escapeHtml(c.tipo) || "-"}</td>
           <td><span class="estado estado-${c.estado || "confirmada"}">${c.estado || "confirmada"}</span></td>
         `;
-        tr.addEventListener("click", () => abrirDetalhes(docSnap.id));
+        tr.addEventListener("click", () => abrirDetalhes(id));
         corpo.appendChild(tr);
-      }
+      });
       if (!algumaLinha) {
         vazio.textContent = "Sem consultas para mostrar (há marcações canceladas escondidas — ativa a opção acima para as ver).";
         vazio.style.display = "block";
@@ -1447,6 +1510,7 @@
       console.error("Erro ao carregar consultas:", err);
       vazio.textContent = "Não foi possível carregar as consultas.";
       vazio.style.display = "block";
+      renderProximasConsultas([]);
     }
   }
 
