@@ -131,6 +131,10 @@
   </div>
 
   <div class="aba-conteudo" data-aba="consultas" style="display:none;">
+    <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; color:#5c5c52; margin-bottom:14px; cursor:pointer;">
+      <input type="checkbox" id="chk-mostrar-canceladas">
+      Mostrar também as marcações canceladas
+    </label>
     <div style="overflow-x:auto;">
     <table>
       <thead>
@@ -1388,6 +1392,7 @@
     const corpo = document.getElementById("lista-consultas");
     const vazio = document.getElementById("vazio");
     corpo.innerHTML = "";
+    vazio.style.display = "none";
 
     let consultasQuery;
     if (temPermissao("verTodasConsultas")) {
@@ -1397,15 +1402,20 @@
     }
 
     const podeVerContacto = temPermissao("verTodasConsultas");
+    const mostrarCanceladas = document.getElementById("chk-mostrar-canceladas").checked;
 
     try {
       const snap = await getDocs(consultasQuery);
       if (snap.empty) {
+        vazio.textContent = "Ainda não há consultas marcadas.";
         vazio.style.display = "block";
         return;
       }
+      let algumaLinha = false;
       for (const docSnap of snap.docs) {
         const c = docSnap.data();
+        if (c.estado === "cancelada" && !mostrarCanceladas) continue;
+        algumaLinha = true;
         if (podeVerContacto) {
           const contacto = await carregarContactoCliente(docSnap.id);
           if (contacto) Object.assign(c, contacto);
@@ -1429,12 +1439,20 @@
         tr.addEventListener("click", () => abrirDetalhes(docSnap.id));
         corpo.appendChild(tr);
       }
+      if (!algumaLinha) {
+        vazio.textContent = "Sem consultas para mostrar (há marcações canceladas escondidas — ativa a opção acima para as ver).";
+        vazio.style.display = "block";
+      }
     } catch (err) {
       console.error("Erro ao carregar consultas:", err);
       vazio.textContent = "Não foi possível carregar as consultas.";
       vazio.style.display = "block";
     }
   }
+
+  document.getElementById("chk-mostrar-canceladas").addEventListener("change", () => {
+    carregarConsultas(window.meuUid);
+  });
 
   window.consultasCache = {};
   let consultaAtualId = null;
