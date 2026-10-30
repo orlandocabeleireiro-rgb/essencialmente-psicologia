@@ -105,6 +105,7 @@
     <button class="admin-tab-btn" data-aba="agenda">Agenda</button>
     <button class="admin-tab-btn" data-aba="consultas">Consultas</button>
     <button class="admin-tab-btn so-admin" data-aba="espera">Lista de espera<span class="aviso-badge" id="badge-espera"></span></button>
+    <button class="admin-tab-btn so-admin" data-aba="triagem">Triagem<span class="aviso-badge" id="badge-triagem"></span></button>
     <button class="admin-tab-btn so-admin" data-aba="psicologos">Psicólogos</button>
     <button class="admin-tab-btn so-admin" data-aba="tipos">Tipos de consulta</button>
     <button class="admin-tab-btn so-admin" data-aba="backup">Backup</button>
@@ -167,6 +168,15 @@
       Pedidos de contacto de clientes que não encontraram um horário de "Primeira consulta" que lhes servisse. Contacta-os e agenda manualmente; depois, remove o pedido daqui.
     </p>
     <div id="lista-espera-itens" style="display:flex; flex-direction:column; gap:10px;"></div>
+  </div>
+
+  <div id="bloco-triagem" class="aba-conteudo" data-aba="triagem" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px; max-width:640px;">
+    <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:16px; font-size:1.1rem;">Triagem — atribuir psicólogo de acompanhamento</h3>
+    <p style="font-size:0.85rem; color:#888; margin-bottom:14px;">
+      Pacientes que já fizeram "Primeira consulta" mas ainda não têm um psicólogo atribuído para as consultas de acompanhamento. Escolhe o psicólogo e clica em "Atribuir".
+    </p>
+    <div id="lista-triagem" style="display:flex; flex-direction:column; gap:10px;"></div>
+    <p id="vazio-triagem" style="color:#888; font-size:0.85rem; display:none;">Sem pacientes por atribuir de momento.</p>
   </div>
 
   <div id="bloco-admin" class="aba-conteudo" data-aba="psicologos" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px; max-width:420px;">
@@ -243,6 +253,20 @@
     <div class="modal-linha"><b>Estado:</b> <span id="d-estado"></span></div>
     <div class="modal-linha" id="linha-link-consulta" style="display:none;">
       <b>Link da consulta:</b> <a id="d-link" href="#" target="_blank" rel="noopener" style="word-break:break-all;"></a>
+    </div>
+
+    <!-- Triagem — só para "Primeira consulta" e só visível a admin. Decide
+         qual psicólogo vai acompanhar este paciente dali para a frente. -->
+    <div id="bloco-triagem-modal" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid #eee;">
+      <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Psicólogo de acompanhamento</label>
+      <p id="d-triagem-atual" style="font-size:0.85rem; color:#888; margin-bottom:8px;"></p>
+      <div style="display:flex; gap:8px;">
+        <select id="d-triagem-psicologo" style="flex:1; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem;">
+          <option value="">Escolhe um psicólogo</option>
+        </select>
+        <button id="btn-atribuir-triagem" style="padding:9px 14px; background:var(--forest); color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; white-space:nowrap;">Atribuir</button>
+      </div>
+      <p id="msg-triagem-modal" style="font-size:0.82rem; margin-top:8px;"></p>
     </div>
 
     <!-- Edição da marcação — só visível para admin. Permite corrigir os
@@ -536,6 +560,7 @@
     // consulta" e "Backup" aparecem também para quem tiver a permissão
     // correspondente.
     document.querySelector('.admin-tab-btn[data-aba="psicologos"]').style.display = role === "admin" ? "inline-block" : "none";
+    document.querySelector('.admin-tab-btn[data-aba="triagem"]').style.display = role === "admin" ? "inline-block" : "none";
     document.querySelector('.admin-tab-btn[data-aba="espera"]').style.display = temPermissao("verTodasConsultas") ? "inline-block" : "none";
     document.querySelector('.admin-tab-btn[data-aba="tipos"]').style.display = temPermissao("giretipos") ? "inline-block" : "none";
     document.querySelector('.admin-tab-btn[data-aba="backup"]').style.display = temPermissao("exportarBackup") ? "inline-block" : "none";
@@ -544,6 +569,7 @@
 
     await carregarListaPsicologosParaAtribuir();
     if (role === "admin") carregarListaGerirPsicologos();
+    if (role === "admin") carregarTriagem();
     if (temPermissao("verTodasConsultas")) carregarListaEspera();
     if (temPermissao("giretipos")) carregarListaTiposConsulta();
 
@@ -896,6 +922,131 @@
     } catch (err) {
       console.error("Erro ao remover pedido:", err);
       alert("Não foi possível remover: " + err.message);
+    }
+  }
+
+  // ---- Triagem (admin) — atribuir, a cada paciente que já fez "Primeira
+  // consulta", o psicólogo que o vai acompanhar dali para a frente. Fica
+  // guardado em "pacientes/{email}", separado das marcações em si, para
+  // sobreviver a futuras consultas de acompanhamento do mesmo cliente. ----
+
+  function idPaciente(email) {
+    return (email || "").trim().toLowerCase();
+  }
+
+  async function obterPaciente(email) {
+    const id = idPaciente(email);
+    if (!id) return null;
+    try {
+      const snap = await getDoc(doc(db, "pacientes", id));
+      return snap.exists() ? snap.data() : null;
+    } catch (err) {
+      console.warn("Não foi possível obter a ficha do paciente:", err.code);
+      return null;
+    }
+  }
+
+  async function atribuirPsicologoPaciente(nome, email, telefone, psicologoId, psicologoNome) {
+    const id = idPaciente(email);
+    if (!id) throw new Error("Esta marcação não tem email guardado.");
+    await setDoc(doc(db, "pacientes", id), {
+      clienteNome: nome || "",
+      clienteEmail: email,
+      clienteTelefone: telefone || "",
+      psicologoAtribuidoId: psicologoId,
+      psicologoAtribuidoNome: psicologoNome,
+      atribuidoEm: serverTimestamp(),
+    }, { merge: true });
+  }
+
+  function atualizarBadgeTriagem(count) {
+    const badge = document.getElementById("badge-triagem");
+    if (!badge) return;
+    badge.textContent = count;
+    badge.style.display = count > 0 ? "block" : "none";
+  }
+
+  async function carregarTriagem() {
+    const container = document.getElementById("lista-triagem");
+    const vazio = document.getElementById("vazio-triagem");
+    if (!container) return;
+    container.innerHTML = "";
+    vazio.style.display = "none";
+
+    try {
+      const snap = await getDocs(
+        query(collection(db, "consultas"), where("tipo", "==", "Primeira consulta"))
+      );
+
+      // Um paciente pode ter mais do que uma "Primeira consulta" (raro,
+      // mas pode acontecer); basta aparecer uma vez na lista de triagem.
+      const porEmail = new Map();
+      for (const docSnap of snap.docs) {
+        const c = docSnap.data();
+        if (c.estado === "cancelada") continue;
+        const contacto = await carregarContactoCliente(docSnap.id);
+        const email = contacto?.clienteEmail;
+        if (!email || porEmail.has(email)) continue;
+        porEmail.set(email, {
+          nome: c.clienteNome || "",
+          email,
+          telefone: contacto?.clienteTelefone || "",
+        });
+      }
+
+      const pendentes = [];
+      for (const paciente of porEmail.values()) {
+        const fichaExistente = await obterPaciente(paciente.email);
+        if (!fichaExistente || !fichaExistente.psicologoAtribuidoId) {
+          pendentes.push(paciente);
+        }
+      }
+
+      atualizarBadgeTriagem(pendentes.length);
+
+      if (pendentes.length === 0) {
+        vazio.style.display = "block";
+        return;
+      }
+
+      pendentes.forEach(paciente => {
+        const linha = document.createElement("div");
+        linha.style.cssText = "padding:12px; background:var(--sage-light); border-radius:6px; font-size:0.88rem; display:flex; align-items:center; gap:10px; flex-wrap:wrap;";
+        linha.innerHTML = `
+          <div style="flex:1; min-width:180px;">
+            <b style="color:var(--teal-text);">${escapeHtml(paciente.nome) || "Sem nome"}</b><br>
+            <span style="color:#666;">${escapeHtml(paciente.email)}${paciente.telefone ? " · " + escapeHtml(paciente.telefone) : ""}</span>
+          </div>
+          <select data-select-psicologo style="padding:8px; border:1px solid #ccc; border-radius:6px; font-size:0.85rem;">
+            <option value="">Escolhe um psicólogo</option>
+          </select>
+          <button data-btn-atribuir style="padding:8px 14px; background:var(--forest); color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem;">Atribuir</button>
+        `;
+        const select = linha.querySelector("[data-select-psicologo]");
+        listaPsicologosParaAtribuir.forEach(p => {
+          const opt = document.createElement("option");
+          opt.value = p.id;
+          opt.textContent = p.nome;
+          select.appendChild(opt);
+        });
+        linha.querySelector("[data-btn-atribuir]").addEventListener("click", async () => {
+          const psicologoId = select.value;
+          if (!psicologoId) return;
+          const psicologoNome = select.selectedOptions[0].textContent;
+          try {
+            await atribuirPsicologoPaciente(paciente.nome, paciente.email, paciente.telefone, psicologoId, psicologoNome);
+            carregarTriagem();
+          } catch (err) {
+            console.error("Erro ao atribuir psicólogo:", err);
+            alert("Não foi possível atribuir: " + err.message);
+          }
+        });
+        container.appendChild(linha);
+      });
+    } catch (err) {
+      console.error("Erro ao carregar triagem:", err);
+      vazio.textContent = "Não foi possível carregar a triagem.";
+      vazio.style.display = "block";
     }
   }
 
@@ -1563,6 +1714,33 @@
       linhaLink.style.display = "none";
     }
 
+    // Triagem — só para admin, e só numa "Primeira consulta" (é aí que se
+    // decide qual psicólogo vai acompanhar este paciente dali para a frente).
+    const blocoTriagemModal = document.getElementById("bloco-triagem-modal");
+    if (window.papelAtual === "admin" && c.tipo === "Primeira consulta") {
+      blocoTriagemModal.style.display = "block";
+      const msgTriagem = document.getElementById("msg-triagem-modal");
+      const textoAtual = document.getElementById("d-triagem-atual");
+      const selectTriagem = document.getElementById("d-triagem-psicologo");
+      msgTriagem.textContent = "";
+      textoAtual.textContent = "A verificar...";
+      selectTriagem.innerHTML = '<option value="">Escolhe um psicólogo</option>';
+      listaPsicologosParaAtribuir.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p.id;
+        opt.textContent = p.nome;
+        selectTriagem.appendChild(opt);
+      });
+
+      const paciente = await obterPaciente(c.clienteEmail);
+      textoAtual.textContent = paciente?.psicologoAtribuidoId
+        ? `Atualmente atribuído a: ${paciente.psicologoAtribuidoNome || "-"}`
+        : "Ainda não tem psicólogo de acompanhamento atribuído.";
+      selectTriagem.value = paciente?.psicologoAtribuidoId || "";
+    } else {
+      blocoTriagemModal.style.display = "none";
+    }
+
     // Bloco de edição da marcação — admin, ou psicólogo com permissão de
     // ver todas as consultas: permite alterar o psicólogo, a data/hora ou
     // o estado, e cancelar a marcação.
@@ -1610,6 +1788,34 @@
 
   document.getElementById("btn-fechar-modal").addEventListener("click", () => {
     document.getElementById("modal-fundo").classList.remove("ativo");
+  });
+
+  document.getElementById("btn-atribuir-triagem").addEventListener("click", async () => {
+    if (!consultaAtualId) return;
+    const c = window.consultasCache[consultaAtualId];
+    const select = document.getElementById("d-triagem-psicologo");
+    const msg = document.getElementById("msg-triagem-modal");
+    const psicologoId = select.value;
+
+    if (!psicologoId) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Escolhe um psicólogo.";
+      return;
+    }
+    const psicologoNome = select.selectedOptions[0].textContent;
+    msg.style.color = "var(--ink)";
+    msg.textContent = "A atribuir...";
+    try {
+      await atribuirPsicologoPaciente(c.clienteNome, c.clienteEmail, c.clienteTelefone, psicologoId, psicologoNome);
+      document.getElementById("d-triagem-atual").textContent = `Atualmente atribuído a: ${psicologoNome}`;
+      msg.style.color = "#3c5a2f";
+      msg.textContent = "Psicólogo atribuído.";
+      carregarTriagem();
+    } catch (err) {
+      console.error("Erro ao atribuir psicólogo:", err);
+      msg.style.color = "#b3452c";
+      msg.textContent = "Não foi possível atribuir: " + err.message;
+    }
   });
 
   document.getElementById("btn-guardar-nota").addEventListener("click", async () => {
