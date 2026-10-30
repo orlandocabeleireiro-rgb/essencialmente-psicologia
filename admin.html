@@ -265,7 +265,18 @@
   </div>
 
   <div id="bloco-conta" class="aba-conteudo" data-aba="conta" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px; max-width:420px;">
-    <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:16px; font-size:1.1rem;">Mudar palavra-passe</h3>
+    <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:16px; font-size:1.1rem;">Os meus dados</h3>
+    <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Email (de login)</label>
+    <p id="conta-email" style="font-size:0.9rem; color:#555; margin-bottom:14px;"></p>
+
+    <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Telemóvel</label>
+    <div style="display:flex; gap:8px; margin-bottom:8px;">
+      <input type="tel" id="conta-telefone" placeholder="O teu número de telemóvel" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:6px;">
+      <button id="btn-guardar-telefone" style="padding:10px 16px; background:var(--forest); color:#fff; border:none; border-radius:6px; cursor:pointer;">Guardar</button>
+    </div>
+    <p id="msg-conta-telefone" style="font-size:0.85rem; margin-bottom:18px;"></p>
+
+    <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:16px; font-size:1.1rem; border-top:1px solid #eee; padding-top:18px;">Mudar palavra-passe</h3>
     <input type="password" id="conta-password-atual" placeholder="Palavra-passe atual" autocomplete="current-password" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
     <input type="password" id="conta-password-nova" placeholder="Nova palavra-passe (mín. 6 carateres)" autocomplete="new-password" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
     <input type="password" id="conta-password-confirmar" placeholder="Confirmar nova palavra-passe" autocomplete="new-password" style="width:100%; padding:10px; margin-bottom:14px; border:1px solid #ccc; border-radius:6px;">
@@ -524,6 +535,24 @@
     }
   });
 
+  // ---- "A minha conta" — guardar o próprio telemóvel ----
+  document.getElementById("btn-guardar-telefone").addEventListener("click", async () => {
+    const telefone = document.getElementById("conta-telefone").value.trim();
+    const msg = document.getElementById("msg-conta-telefone");
+    msg.style.color = "var(--ink)";
+    msg.textContent = "A guardar...";
+    try {
+      await updateDoc(doc(db, "psicologos", window.meuUid), { telefone });
+      window.meuTelefone = telefone;
+      msg.style.color = "#3c6b2f";
+      msg.textContent = "Telemóvel guardado.";
+    } catch (err) {
+      console.error("Erro ao guardar telemóvel:", err);
+      msg.style.color = "#b3452c";
+      msg.textContent = "Não foi possível guardar: " + err.message;
+    }
+  });
+
   // ---- "A minha conta" — mudar a própria palavra-passe ----
   // Pede a palavra-passe atual e usa-a para reautenticar antes de alterar:
   // o Firebase exige um login "recente" para esta operação, e isto evita
@@ -605,6 +634,20 @@
     window.papelAtual = role;
     window.meuUid = user.uid;
     window.meuNome = perfil.nome || user.email;
+    window.meuEmail = user.email;
+    window.meuTelefone = perfil.telefone || "";
+
+    // Mantém o email do perfil sincronizado com o da conta de login — é
+    // usado pelas notificações automáticas por email (ver Cloud Functions)
+    // para saber para onde enviar, já que não vinha guardado até agora.
+    if (perfil.email !== user.email) {
+      updateDoc(perfilRef, { email: user.email }).catch(err => {
+        console.warn("Não foi possível sincronizar o email do perfil:", err);
+      });
+    }
+
+    document.getElementById("conta-email").textContent = user.email;
+    document.getElementById("conta-telefone").value = window.meuTelefone;
     // Permissões extra de um psicólogo (não-admin), atribuídas pelo admin
     // na lista "Psicólogos existentes". Admin tem sempre tudo — ver
     // temPermissao().
