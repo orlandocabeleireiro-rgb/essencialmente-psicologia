@@ -138,6 +138,42 @@
       <p id="vazio-proximas" style="font-size:0.85rem; color:#888; display:none;">Sem consultas marcadas para os próximos dias.</p>
     </div>
 
+    <details id="bloco-nova-consulta" style="display:none; margin-bottom:28px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:20px; max-width:640px;">
+      <summary style="cursor:pointer; font-family:'Fraunces', serif; color:var(--forest); font-size:1.05rem;">Marcar nova consulta</summary>
+
+      <div style="margin-top:16px;">
+        <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Paciente</label>
+        <input type="text" id="nc-busca-paciente" placeholder="Procura por nome ou email (de uma marcação já existente)" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem; margin-bottom:6px;">
+        <div id="nc-resultados-paciente" style="display:flex; flex-direction:column; gap:4px; margin-bottom:8px; max-height:160px; overflow-y:auto;"></div>
+        <p id="nc-paciente-selecionado" style="font-size:0.85rem; color:#3c6b2f; margin-bottom:10px; display:none; cursor:pointer;" title="Toca para trocar de paciente"></p>
+
+        <details style="margin-bottom:14px;">
+          <summary style="cursor:pointer; font-size:0.82rem; color:#888;">Ou inserir dados de um cliente novo</summary>
+          <input type="text" id="nc-novo-nome" placeholder="Nome" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem; margin-top:8px; margin-bottom:8px;">
+          <input type="email" id="nc-novo-email" placeholder="Email" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem; margin-bottom:8px;">
+          <input type="tel" id="nc-novo-telefone" placeholder="Telefone" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem;">
+        </details>
+
+        <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Tipo de consulta</label>
+        <select id="nc-tipo" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem; margin-bottom:10px;">
+          <option value="">A carregar...</option>
+        </select>
+
+        <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Psicólogo</label>
+        <select id="nc-psicologo" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem; margin-bottom:10px;">
+          <option value="">Escolhe um psicólogo</option>
+        </select>
+
+        <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Hora</label>
+        <select id="nc-horario" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem; margin-bottom:14px;">
+          <option value="">Escolhe primeiro um psicólogo</option>
+        </select>
+
+        <button id="btn-marcar-nova-consulta" style="padding:11px 18px; background:var(--forest); color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:0.9rem;">Marcar consulta</button>
+        <p id="msg-nova-consulta" style="font-size:0.85rem; margin-top:10px;"></p>
+      </div>
+    </details>
+
     <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; color:#5c5c52; margin-bottom:14px; cursor:pointer;">
       <input type="checkbox" id="chk-mostrar-canceladas">
       Mostrar também as marcações canceladas
@@ -255,6 +291,31 @@
       <b>Link da consulta:</b> <a id="d-link" href="#" target="_blank" rel="noopener" style="word-break:break-all;"></a>
     </div>
 
+    <!-- Marcar a próxima consulta deste cliente — disponível a qualquer
+         utilizador (admin ou psicólogo). Usa uma Cloud Function, para o
+         email/telefone do cliente nunca chegarem ao browser de um
+         psicólogo sem permissão de ver contactos. -->
+    <div style="margin-top:14px; padding-top:14px; border-top:1px solid #eee;">
+      <button id="btn-abrir-marcar-proxima" style="padding:9px 14px; background:none; border:1px solid var(--forest); color:var(--forest); border-radius:6px; cursor:pointer; font-size:0.85rem;">Marcar próxima consulta</button>
+      <div id="form-marcar-proxima" style="display:none; margin-top:12px;">
+        <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Tipo de consulta</label>
+        <select id="mp-tipo" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem; margin-bottom:10px;">
+          <option value="">A carregar...</option>
+        </select>
+
+        <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Psicólogo</label>
+        <select id="mp-psicologo" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem; margin-bottom:10px;"></select>
+
+        <label style="font-size:0.85rem; font-weight:600; color:var(--teal-text); display:block; margin-bottom:4px;">Hora</label>
+        <select id="mp-horario" style="width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem; margin-bottom:12px;">
+          <option value="">Escolhe primeiro um psicólogo</option>
+        </select>
+
+        <button id="btn-confirmar-marcar-proxima" style="padding:9px 14px; background:var(--forest); color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem;">Confirmar marcação</button>
+        <p id="msg-marcar-proxima" style="font-size:0.82rem; margin-top:8px;"></p>
+      </div>
+    </div>
+
     <!-- Triagem — só para "Primeira consulta" e só visível a admin. Decide
          qual psicólogo vai acompanhar este paciente dali para a frente. -->
     <div id="bloco-triagem-modal" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid #eee;">
@@ -345,7 +406,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app-check.js";
-  import { getFirestore, enableIndexedDbPersistence, collection, getDocs, addDoc, setDoc, deleteDoc, deleteField, doc, getDoc, updateDoc, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getFirestore, enableIndexedDbPersistence, collection, getDocs, addDoc, setDoc, deleteDoc, deleteField, doc, getDoc, updateDoc, query, where, orderBy, serverTimestamp, runTransaction } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
   import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-functions.js";
 
@@ -565,6 +626,7 @@
     document.querySelector('.admin-tab-btn[data-aba="tipos"]').style.display = temPermissao("giretipos") ? "inline-block" : "none";
     document.querySelector('.admin-tab-btn[data-aba="backup"]').style.display = temPermissao("exportarBackup") ? "inline-block" : "none";
     document.getElementById("bloco-migrar-contactos").style.display = role === "admin" ? "block" : "none";
+    document.getElementById("bloco-nova-consulta").style.display = temPermissao("verTodasConsultas") ? "block" : "none";
     mostrarAba("agenda");
 
     await carregarListaPsicologosParaAtribuir();
@@ -1556,6 +1618,295 @@
     return `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`;
   }
 
+  // ---- Helpers partilhados por "Marcar nova consulta" e "Marcar próxima
+  // consulta" — tipos de consulta e horas livres de um psicólogo. ----
+
+  async function carregarTiposParaFormulario(selectEl) {
+    selectEl.innerHTML = '<option value="">Escolhe o tipo</option><option value="Primeira consulta">Primeira consulta</option>';
+    try {
+      const snap = await getDocs(query(collection(db, "tiposConsulta"), orderBy("criadoEm", "asc")));
+      snap.forEach(docSnap => {
+        const t = docSnap.data();
+        if (!t.nome) return;
+        const opt = document.createElement("option");
+        opt.value = t.nome;
+        opt.textContent = t.nome;
+        selectEl.appendChild(opt);
+      });
+    } catch (err) {
+      console.error("Erro ao carregar tipos de consulta:", err);
+    }
+  }
+
+  async function carregarHorasLivresPsicologo(psicologoId, selectEl) {
+    if (!psicologoId) {
+      selectEl.innerHTML = '<option value="">Escolhe primeiro um psicólogo</option>';
+      return;
+    }
+    selectEl.innerHTML = '<option value="">A carregar horários...</option>';
+    try {
+      const q = query(
+        collection(db, "disponibilidade"),
+        where("psicologoId", "==", psicologoId),
+        where("reservado", "==", false)
+      );
+      const snap = await getDocs(q);
+      const agoraChave = dataHojeStr() + horaAgoraStr();
+      const horarios = snap.docs
+        .map(d => d.data())
+        .filter(d => `${d.data}${d.hora}` > agoraChave)
+        .sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora));
+
+      if (horarios.length === 0) {
+        selectEl.innerHTML = '<option value="">Sem horários disponíveis</option>';
+        return;
+      }
+      selectEl.innerHTML = '<option value="">Escolhe um horário</option>';
+      horarios.forEach(d => {
+        const opt = document.createElement("option");
+        opt.value = `${d.data}_${d.hora}`;
+        opt.dataset.data = d.data;
+        opt.dataset.hora = d.hora;
+        const [ano, mes, dia] = (d.data || "").split("-");
+        opt.textContent = `${dia}/${mes}/${ano} às ${d.hora}`;
+        selectEl.appendChild(opt);
+      });
+    } catch (err) {
+      console.error("Erro ao carregar horários:", err);
+      selectEl.innerHTML = `<option value="">Erro: ${err.message}</option>`;
+    }
+  }
+
+  // ---- "Marcar nova consulta" (admin / verTodasConsultas) — form geral,
+  // com procura de paciente entre as consultas já conhecidas. ----
+
+  document.getElementById("nc-busca-paciente").addEventListener("input", (ev) => {
+    const termo = ev.target.value.trim().toLowerCase();
+    const container = document.getElementById("nc-resultados-paciente");
+    container.innerHTML = "";
+    if (termo.length < 2) return;
+
+    const vistos = new Set();
+    const resultados = [];
+    Object.values(window.consultasCache).forEach(c => {
+      if (!c.clienteEmail) return;
+      const chave = c.clienteEmail.toLowerCase();
+      if (vistos.has(chave)) return;
+      const alvo = `${(c.clienteNome || "").toLowerCase()} ${chave}`;
+      if (!alvo.includes(termo)) return;
+      vistos.add(chave);
+      resultados.push({ nome: c.clienteNome || "", email: c.clienteEmail, telefone: c.clienteTelefone || "" });
+    });
+
+    resultados.slice(0, 8).forEach(p => {
+      const item = document.createElement("div");
+      item.style.cssText = "padding:7px 10px; background:var(--sage-light); border-radius:6px; cursor:pointer; font-size:0.85rem;";
+      item.textContent = `${p.nome || "Sem nome"} — ${p.email}`;
+      item.addEventListener("click", () => {
+        window.ncPacienteSelecionado = p;
+        const linhaSelecionado = document.getElementById("nc-paciente-selecionado");
+        linhaSelecionado.textContent = `Selecionado: ${p.nome || "Sem nome"} (${p.email}) — toca para trocar`;
+        linhaSelecionado.style.display = "block";
+        container.innerHTML = "";
+        document.getElementById("nc-busca-paciente").value = "";
+      });
+      container.appendChild(item);
+    });
+  });
+
+  document.getElementById("nc-paciente-selecionado").addEventListener("click", () => {
+    window.ncPacienteSelecionado = null;
+    document.getElementById("nc-paciente-selecionado").style.display = "none";
+  });
+
+  document.getElementById("nc-psicologo").addEventListener("change", (ev) => {
+    carregarHorasLivresPsicologo(ev.target.value, document.getElementById("nc-horario"));
+  });
+
+  document.getElementById("bloco-nova-consulta").addEventListener("toggle", (ev) => {
+    if (!ev.target.open) return;
+    carregarTiposParaFormulario(document.getElementById("nc-tipo"));
+    const select = document.getElementById("nc-psicologo");
+    select.innerHTML = '<option value="">Escolhe um psicólogo</option>';
+    listaPsicologosParaAtribuir.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = p.nome;
+      select.appendChild(opt);
+    });
+  });
+
+  document.getElementById("btn-marcar-nova-consulta").addEventListener("click", async () => {
+    const msg = document.getElementById("msg-nova-consulta");
+    msg.style.color = "#b3452c";
+
+    let nome, email, telefone;
+    if (window.ncPacienteSelecionado) {
+      ({ nome, email, telefone } = window.ncPacienteSelecionado);
+    } else {
+      nome = document.getElementById("nc-novo-nome").value.trim();
+      email = document.getElementById("nc-novo-email").value.trim();
+      telefone = document.getElementById("nc-novo-telefone").value.trim();
+    }
+    const tipo = document.getElementById("nc-tipo").value;
+    const psicologoSelect = document.getElementById("nc-psicologo");
+    const psicologoId = psicologoSelect.value;
+    const psicologoNome = psicologoSelect.selectedOptions[0]?.textContent || "";
+    const horarioSelect = document.getElementById("nc-horario");
+    const opt = horarioSelect.selectedOptions[0];
+
+    if (!nome || !email) {
+      msg.textContent = "Escolhe um paciente existente, ou preenche nome e email de um cliente novo.";
+      return;
+    }
+    if (!tipo) {
+      msg.textContent = "Escolhe o tipo de consulta.";
+      return;
+    }
+    if (!psicologoId) {
+      msg.textContent = "Escolhe o psicólogo.";
+      return;
+    }
+    if (!horarioSelect.value) {
+      msg.textContent = "Escolhe uma hora.";
+      return;
+    }
+
+    msg.style.color = "var(--ink)";
+    msg.textContent = "A marcar...";
+
+    const novaConsultaRef = doc(collection(db, "consultas"));
+    const slotId = `${psicologoId}_${opt.dataset.data}_${opt.dataset.hora}`;
+    const slotRef = doc(db, "disponibilidade", slotId);
+    const privadoRef = doc(db, "consultas", novaConsultaRef.id, "privado", "dados");
+
+    try {
+      await runTransaction(db, async (tx) => {
+        const slotSnap = await tx.get(slotRef);
+        if (!slotSnap.exists() || slotSnap.data().reservado) {
+          throw new Error("HORA_OCUPADA");
+        }
+        tx.set(novaConsultaRef, {
+          clienteNome: nome,
+          psicologoId, psicologoNome, tipo,
+          data: opt.dataset.data,
+          hora: opt.dataset.hora,
+          estado: "confirmada",
+          visualizada: false,
+          notaInterna: "",
+          criadoEm: serverTimestamp(),
+        });
+        tx.set(privadoRef, { clienteEmail: email, clienteTelefone: telefone || "" });
+        tx.update(slotRef, { reservado: true, consultaId: novaConsultaRef.id });
+      });
+
+      msg.style.color = "#3c5a2f";
+      msg.textContent = "Consulta marcada com sucesso.";
+      window.ncPacienteSelecionado = null;
+      document.getElementById("nc-paciente-selecionado").style.display = "none";
+      document.getElementById("nc-busca-paciente").value = "";
+      document.getElementById("nc-novo-nome").value = "";
+      document.getElementById("nc-novo-email").value = "";
+      document.getElementById("nc-novo-telefone").value = "";
+      document.getElementById("nc-tipo").value = "";
+      document.getElementById("nc-psicologo").value = "";
+      document.getElementById("nc-horario").innerHTML = '<option value="">Escolhe primeiro um psicólogo</option>';
+      carregarConsultas(window.meuUid);
+      carregarAgenda();
+    } catch (err) {
+      console.error("Erro ao marcar nova consulta:", err);
+      msg.style.color = "#b3452c";
+      msg.textContent = err.message === "HORA_OCUPADA"
+        ? "Essa hora acabou de ser ocupada. Escolhe outra."
+        : "Não foi possível marcar: " + err.message;
+    }
+  });
+
+  // ---- "Marcar próxima consulta" (qualquer utilizador) — atalho a partir
+  // de uma marcação já existente, via Cloud Function (ver explicação no
+  // HTML do modal). ----
+
+  document.getElementById("btn-abrir-marcar-proxima").addEventListener("click", async () => {
+    const form = document.getElementById("form-marcar-proxima");
+    const aberto = form.style.display === "block";
+    form.style.display = aberto ? "none" : "block";
+    if (aberto) return;
+
+    const c = window.consultasCache[consultaAtualId];
+    await carregarTiposParaFormulario(document.getElementById("mp-tipo"));
+
+    const psicologoSelect = document.getElementById("mp-psicologo");
+    psicologoSelect.innerHTML = "";
+    if (temPermissao("verTodasConsultas")) {
+      listaPsicologosParaAtribuir.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p.id;
+        opt.textContent = p.nome;
+        psicologoSelect.appendChild(opt);
+      });
+      psicologoSelect.value = c?.psicologoId || window.meuUid;
+      psicologoSelect.disabled = false;
+    } else {
+      const opt = document.createElement("option");
+      opt.value = window.meuUid;
+      opt.textContent = window.meuNome || "Eu";
+      psicologoSelect.appendChild(opt);
+      psicologoSelect.value = window.meuUid;
+      psicologoSelect.disabled = true;
+    }
+    document.getElementById("msg-marcar-proxima").textContent = "";
+    await carregarHorasLivresPsicologo(psicologoSelect.value, document.getElementById("mp-horario"));
+  });
+
+  document.getElementById("mp-psicologo").addEventListener("change", (ev) => {
+    carregarHorasLivresPsicologo(ev.target.value, document.getElementById("mp-horario"));
+  });
+
+  document.getElementById("btn-confirmar-marcar-proxima").addEventListener("click", async () => {
+    if (!consultaAtualId) return;
+    const msg = document.getElementById("msg-marcar-proxima");
+    const tipo = document.getElementById("mp-tipo").value;
+    const psicologoSelect = document.getElementById("mp-psicologo");
+    const psicologoId = psicologoSelect.value;
+    const psicologoNome = psicologoSelect.selectedOptions[0]?.textContent || "";
+    const horarioSelect = document.getElementById("mp-horario");
+    const opt = horarioSelect.selectedOptions[0];
+
+    if (!tipo) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Escolhe o tipo de consulta.";
+      return;
+    }
+    if (!horarioSelect.value) {
+      msg.style.color = "#b3452c";
+      msg.textContent = "Escolhe uma hora.";
+      return;
+    }
+
+    msg.style.color = "var(--ink)";
+    msg.textContent = "A marcar...";
+    try {
+      await auth.currentUser.getIdToken(true);
+      const marcarProximaConsultaFn = httpsCallable(functionsApp, "marcarProximaConsulta");
+      await marcarProximaConsultaFn({
+        consultaOrigemId: consultaAtualId,
+        tipo,
+        psicologoId,
+        psicologoNome,
+        data: opt.dataset.data,
+        hora: opt.dataset.hora,
+      });
+      msg.style.color = "#3c5a2f";
+      msg.textContent = "Consulta marcada com sucesso.";
+      carregarConsultas(window.meuUid);
+      carregarAgenda();
+    } catch (err) {
+      console.error("Erro ao marcar próxima consulta:", err);
+      msg.style.color = "#b3452c";
+      msg.textContent = "Não foi possível marcar: " + err.message;
+    }
+  });
+
   // "Próximas consultas" — mostra, à parte da tabela completa, só as que
   // ainda vão acontecer (não canceladas), da mais próxima para a mais
   // distante. Usa o mesmo conjunto de dados já carregado por
@@ -1702,6 +2053,11 @@
     document.getElementById("d-estado").textContent = c.estado || "confirmada";
     document.getElementById("d-nota").value = c.notaInterna || "";
     document.getElementById("msg-nota").textContent = "";
+
+    // Fecha o mini-formulário de "Marcar próxima consulta" sempre que se
+    // abre uma marcação diferente, para não ficar aberto com dados de outra.
+    document.getElementById("form-marcar-proxima").style.display = "none";
+    document.getElementById("msg-marcar-proxima").textContent = "";
 
     // Link da consulta — visível a todos (admin e psicólogo) em modo leitura
     const linhaLink = document.getElementById("linha-link-consulta");
