@@ -1,7 +1,7 @@
 {
   "name": "functions",
   "description": "Cloud Functions for essencialmente-psicologia",
-  "engines": { "node": "20" },
+  "engines": { "node": "22" },
   "main": "index.js",
   "dependencies": {
     "firebase-admin": "^12.6.0",
