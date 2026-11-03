@@ -1,15 +1,43 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
+const nodemailer = require("nodemailer");
 
 admin.initializeApp();
 
 const REGIAO = "us-central1";
 
-// Notificações automáticas por email — assumem que existe uma coleção
-// "mail" ligada à extensão oficial do Firebase "Trigger Email" (escrever lá
-// um documento é o que dispara o envio a sério; estas functions nunca
-// falam diretamente com um servidor de email).
+// Notificações automáticas por email — enviadas diretamente por estas
+// functions via Gmail (SMTP), usando uma conta e uma "palavra-passe de
+// aplicação" guardadas como secrets do Firebase (nunca ficam no código nem
+// no repositório). Não depende de nenhuma extensão do Firebase.
+const gmailUser = defineSecret("GMAIL_USER");
+const gmailAppPassword = defineSecret("GMAIL_APP_PASSWORD");
+const SECRETS_EMAIL = [gmailUser, gmailAppPassword];
+
+async function enviarEmail({ to, subject, text }) {
+  const destinatarios = Array.isArray(to) ? to : [to];
+  if (destinatarios.length === 0) return;
+  const transportador = nodemailer.createTransport({
+    service: "gmail",
+    auth: { user: gmailUser.value(), pass: gmailAppPassword.value() },
+  });
+  try {
+    await transportador.sendMail({
+      from: `Essencialmente <${gmailUser.value()}>`,
+      to: destinatarios.join(","),
+      subject,
+      text,
+    });
+  } catch (err) {
+    // Uma falha a enviar um email não deve impedir o resto (ex: se o email
+    // do cliente falhar, o psicólogo deve continuar a ser avisado) — só
+    // regista o erro nos logs da function.
+    console.error("Erro ao enviar email:", subject, "para", destinatarios, err);
+  }
+}
+
 async function obterEmailsAdmins(db) {
   const snap = await db.collection("psicologos").where("role", "==", "admin").get();
   return snap.docs.map(d => d.data().email).filter(Boolean);
@@ -144,7 +172,7 @@ exports.marcarProximaConsulta = onCall({ region: REGIAO }, async (request) => {
 // admin ("Marcar nova consulta"), ou pela function marcarProximaConsulta.
 // Avisa o psicólogo atribuído, confirma ao cliente, e avisa os admins se
 // for uma "Primeira consulta" (para a triagem não passar despercebida).
-exports.notificarNovaConsulta = onDocumentCreated({ region: REGIAO, document: "consultas/{consultaId}" }, async (event) => {
+exports.notificarNovaConsulta = onDocumentCreated({ region: REGIAO, document: "consultas/{consultaId}", secrets: SECRETS_EMAIL }, async (event) => {
   const db = admin.firestore();
   const c = event.data.data();
   const linhaDataHora = `${c.data || "-"} às ${c.hora || "-"}`;
@@ -156,53 +184,45 @@ exports.notificarNovaConsulta = onDocumentCreated({ region: REGIAO, document: "c
     const psicologoSnap = await db.collection("psicologos").doc(c.psicologoId).get();
     const perfilPsicologo = psicologoSnap.exists ? psicologoSnap.data() : {};
     if (perfilPsicologo.email) {
-      await db.collection("mail").add({
-        to: [perfilPsicologo.email],
-        message: {
-          subject: "Nova consulta atribuída — Essencialmente",
-          text: `Olá ${perfilPsicologo.nome || ""},\n\nFoi-te atribuída uma nova consulta:\n\nCliente: ${c.clienteNome || "-"}\nTipo: ${c.tipo || "-"}\nData/Hora: ${linhaDataHora}\n\nConsulta o painel para mais detalhes.\n\n— Essencialmente`,
-        },
+      await enviarEmail({
+        to: perfilPsicologo.email,
+        subject: "Nova consulta atribuída — Essencialmente",
+        text: `Olá ${perfilPsicologo.nome || ""},\n\nFoi-te atribuída uma nova consulta:\n\nCliente: ${c.clienteNome || "-"}\nTipo: ${c.tipo || "-"}\nData/Hora: ${linhaDataHora}\n\nConsulta o painel para mais detalhes.\n\n— Essencialmente`,
       });
     }
   }
 
   if (contacto.clienteEmail) {
-    await db.collection("mail").add({
-      to: [contacto.clienteEmail],
-      message: {
-        subject: "A sua consulta foi marcada — Essencialmente",
-        text: `Olá ${c.clienteNome || ""},\n\nA sua consulta (${c.tipo || "-"}) ficou marcada para ${linhaDataHora}.\n\nEntraremos em contacto para confirmar e enviar o link da videochamada.\n\n— Essencialmente`,
-      },
+    await enviarEmail({
+      to: contacto.clienteEmail,
+      subject: "A sua consulta foi marcada — Essencialmente",
+      text: `Olá ${c.clienteNome || ""},\n\nA sua consulta (${c.tipo || "-"}) ficou marcada para ${linhaDataHora}.\n\nEntraremos em contacto para confirmar e enviar o link da videochamada.\n\n— Essencialmente`,
     });
   }
 
   if (c.tipo === "Primeira consulta") {
     const emailsAdmins = await obterEmailsAdmins(db);
     if (emailsAdmins.length > 0) {
-      await db.collection("mail").add({
+      await enviarEmail({
         to: emailsAdmins,
-        message: {
-          subject: "Nova Primeira Consulta marcada — Essencialmente",
-          text: `Uma nova "Primeira consulta" foi marcada.\n\nCliente: ${c.clienteNome || "-"}\nData/Hora: ${linhaDataHora}\n\nVai à aba Triagem para, mais tarde, atribuir um psicólogo de acompanhamento.`,
-        },
+        subject: "Nova Primeira Consulta marcada — Essencialmente",
+        text: `Uma nova "Primeira consulta" foi marcada.\n\nCliente: ${c.clienteNome || "-"}\nData/Hora: ${linhaDataHora}\n\nVai à aba Triagem para, mais tarde, atribuir um psicólogo de acompanhamento.`,
       });
     }
   }
 });
 
 // Dispara sempre que chega um novo pedido de contacto na Lista de espera.
-exports.notificarNovoPedidoEspera = onDocumentCreated({ region: REGIAO, document: "listaEspera/{itemId}" }, async (event) => {
+exports.notificarNovoPedidoEspera = onDocumentCreated({ region: REGIAO, document: "listaEspera/{itemId}", secrets: SECRETS_EMAIL }, async (event) => {
   const db = admin.firestore();
   const p = event.data.data();
 
   const emailsAdmins = await obterEmailsAdmins(db);
   if (emailsAdmins.length === 0) return;
 
-  await db.collection("mail").add({
+  await enviarEmail({
     to: emailsAdmins,
-    message: {
-      subject: "Novo pedido de contacto — Essencialmente",
-      text: `Novo pedido na Lista de espera:\n\nNome: ${p.clienteNome || "-"}\nEmail: ${p.clienteEmail || "-"}\nTelefone: ${p.clienteTelefone || "-"}\nNotas: ${p.notas || "-"}\n\nVai à aba Lista de espera para contactar.`,
-    },
+    subject: "Novo pedido de contacto — Essencialmente",
+    text: `Novo pedido na Lista de espera:\n\nNome: ${p.clienteNome || "-"}\nEmail: ${p.clienteEmail || "-"}\nTelefone: ${p.clienteTelefone || "-"}\nNotas: ${p.notas || "-"}\n\nVai à aba Lista de espera para contactar.`,
   });
 });
