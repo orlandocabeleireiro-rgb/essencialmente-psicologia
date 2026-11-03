@@ -215,26 +215,37 @@
     <p id="vazio-triagem" style="color:#888; font-size:0.85rem; display:none;">Sem pacientes por atribuir de momento.</p>
   </div>
 
-  <div id="bloco-admin" class="aba-conteudo" data-aba="psicologos" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px; max-width:420px;">
+  <div id="bloco-admin" class="aba-conteudo" data-aba="psicologos" style="display:none; margin-bottom:32px; background:#fff; border:1px solid #e7e3d9; border-radius:10px; padding:24px; max-width:680px;">
     <h3 style="font-family:'Fraunces', serif; color:var(--forest); margin-bottom:16px; font-size:1.1rem;">Adicionar psicólogo</h3>
-    <input type="text" id="novo-nome" placeholder="Nome" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
-    <input type="email" id="novo-email" placeholder="Email" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
-    <input type="password" id="novo-password" placeholder="Palavra-passe inicial" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
-    <input type="text" id="novo-especialidade" placeholder="Especialidade" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
-    <select id="novo-role" style="width:100%; padding:10px; margin-bottom:14px; border:1px solid #ccc; border-radius:6px;">
-      <option value="psicologo">Psicólogo</option>
-      <option value="admin">Administrador</option>
-    </select>
-    <label style="display:flex; align-items:center; gap:8px; font-size:0.88rem; margin-bottom:14px; cursor:pointer;">
-      <input type="checkbox" id="novo-atende-primeira">
-      Atende "Primeira consulta" (aparece no calendário público)
-    </label>
-    <button id="btn-criar-psicologo" style="width:100%; padding:11px; background:var(--forest); color:#fff; border:none; border-radius:6px; cursor:pointer;">Criar</button>
-    <p id="msg-criar" style="font-size:0.85rem; margin-top:10px;"></p>
+    <div style="max-width:420px;">
+      <input type="text" id="novo-nome" placeholder="Nome" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
+      <input type="email" id="novo-email" placeholder="Email" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
+      <input type="password" id="novo-password" placeholder="Palavra-passe inicial" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
+      <input type="text" id="novo-especialidade" placeholder="Especialidade" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px;">
+      <select id="novo-role" style="width:100%; padding:10px; margin-bottom:14px; border:1px solid #ccc; border-radius:6px;">
+        <option value="psicologo">Psicólogo</option>
+        <option value="admin">Administrador</option>
+      </select>
+      <label style="display:flex; align-items:center; gap:8px; font-size:0.88rem; margin-bottom:14px; cursor:pointer;">
+        <input type="checkbox" id="novo-atende-primeira">
+        Atende "Primeira consulta" (aparece no calendário público)
+      </label>
+      <button id="btn-criar-psicologo" style="width:100%; padding:11px; background:var(--forest); color:#fff; border:none; border-radius:6px; cursor:pointer;">Criar</button>
+      <p id="msg-criar" style="font-size:0.85rem; margin-top:10px;"></p>
+    </div>
 
     <div style="margin-top:22px; border-top:1px solid #e7e3d9; padding-top:16px;">
       <h4 style="font-family:'Fraunces', serif; color:var(--forest); font-size:0.95rem; margin-bottom:10px;">Psicólogos existentes</h4>
-      <div id="lista-gerir-psicologos" style="display:flex; flex-direction:column; gap:6px;"></div>
+      <p style="font-size:0.8rem; color:#888; margin-bottom:10px;">Toca num nome para ver os dados completos.</p>
+      <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr><th>Nome</th><th>Email</th><th>Papel</th></tr>
+        </thead>
+        <tbody id="lista-gerir-psicologos"></tbody>
+      </table>
+      </div>
+      <p id="vazio-psicologos" style="display:none; color:#888; font-size:0.85rem; margin-top:10px;">Ainda sem psicólogos.</p>
     </div>
   </div>
 
@@ -410,6 +421,32 @@
     <div class="modal-botoes">
       <button id="btn-guardar-nota">Guardar nota</button>
       <button id="btn-fechar-modal">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-fundo" id="modal-fundo-psicologo">
+  <div class="modal-caixa" id="modal-caixa-psicologo" style="max-width:480px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+      <h3 style="margin-bottom:0;">Detalhes do psicólogo</h3>
+    </div>
+    <div class="modal-linha"><b>Nome:</b> <span id="dp-nome"></span></div>
+    <div class="modal-linha"><b>Email:</b> <span id="dp-email"></span></div>
+    <div class="modal-linha"><b>Telefone:</b> <span id="dp-telefone"></span></div>
+    <div class="modal-linha"><b>Especialidade:</b> <span id="dp-especialidade"></span></div>
+    <div class="modal-linha"><b>Papel:</b> <span id="dp-papel"></span></div>
+
+    <div id="dp-bloco-opcoes" style="margin-top:14px; padding-top:14px; border-top:1px solid #eee;">
+      <label style="display:flex; align-items:center; gap:8px; font-size:0.88rem; cursor:pointer; margin-bottom:10px;">
+        <input type="checkbox" id="dp-atende-primeira">
+        Atende "Primeira consulta" (aparece no calendário público)
+      </label>
+      <div id="dp-permissoes" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+
+    <div class="modal-botoes" style="margin-top:18px;">
+      <button id="btn-fechar-modal-psicologo" style="background:none; border:1px solid #ccc !important; color:var(--ink);">Fechar</button>
+      <button id="btn-remover-psicologo-modal" style="background:none; border:1px solid #b3452c !important; color:#b3452c;">Remover psicólogo</button>
     </div>
   </div>
 </div>
@@ -745,6 +782,7 @@
           role: docSnap.data().role || "psicologo",
           email: docSnap.data().email || "",
           telefone: docSnap.data().telefone || "",
+          especialidade: docSnap.data().especialidade || "",
           atendePrimeiraConsulta: !!docSnap.data().atendePrimeiraConsulta,
           permissoes: docSnap.data().permissoes || {},
         });
@@ -769,53 +807,74 @@
 
   function carregarListaGerirPsicologos() {
     const container = document.getElementById("lista-gerir-psicologos");
+    const vazio = document.getElementById("vazio-psicologos");
     if (!container) return;
+    container.innerHTML = "";
     if (listaPsicologosParaAtribuir.length === 0) {
-      container.innerHTML = '<p style="color:#888; font-size:0.85rem;">Ainda sem psicólogos.</p>';
+      vazio.style.display = "block";
       return;
     }
-    container.innerHTML = "";
+    vazio.style.display = "none";
     listaPsicologosParaAtribuir.forEach(p => {
-      const linha = document.createElement("div");
-      linha.style.cssText = "padding:10px; background:var(--sage-light); border-radius:6px; font-size:0.85rem;";
-
-      const permissoesHtml = p.role === "admin"
-        ? ""
-        : PERMISSOES_ATRIBUIVEIS.map(perm => `
-            <label style="display:flex; align-items:center; gap:5px; font-size:0.76rem; cursor:pointer;">
-              <input type="checkbox" data-permissao-id="${p.id}" data-permissao-chave="${perm.chave}" ${p.permissoes[perm.chave] ? "checked" : ""}>
-              ${perm.label}
-            </label>
-          `).join("");
-
-      linha.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px;">
-          <span>${escapeHtml(p.nome)} ${p.role === "admin" ? "<b style='color:var(--forest);'>(admin)</b>" : ""}</span>
-          <button data-id="${p.id}" style="background:none; border:none; color:#b3452c; cursor:pointer; font-size:0.8rem;">Remover</button>
-        </div>
-        <div style="font-size:0.78rem; color:#666; margin-bottom:8px;">
-          ${escapeHtml(p.email) || "<em>email ainda não disponível (entra no painel para sincronizar)</em>"}${p.telefone ? " · " + escapeHtml(p.telefone) : ""}
-        </div>
-        <div style="display:flex; flex-wrap:wrap; gap:6px 14px;">
-          <label style="display:flex; align-items:center; gap:5px; font-size:0.76rem; cursor:pointer;">
-            <input type="checkbox" data-toggle-id="${p.id}" ${p.atendePrimeiraConsulta ? "checked" : ""}>
-            1ª consulta
-          </label>
-          ${permissoesHtml}
-        </div>
+      const tr = document.createElement("tr");
+      tr.className = "linha-consulta";
+      tr.innerHTML = `
+        <td>${escapeHtml(p.nome)}${p.role === "admin" ? " <b style='color:var(--forest);'>(admin)</b>" : ""}</td>
+        <td>${escapeHtml(p.email) || "-"}</td>
+        <td>${p.role === "admin" ? "Administrador" : "Psicólogo"}</td>
       `;
-      linha.querySelector("button").addEventListener("click", () => removerPsicologo(p.id, p.nome));
-      linha.querySelector("input[data-toggle-id]").addEventListener("change", (e) => {
-        alternarAtendePrimeiraConsulta(p.id, e.target.checked);
-      });
-      linha.querySelectorAll("input[data-permissao-chave]").forEach(input => {
-        input.addEventListener("change", (e) => {
-          alternarPermissao(p.id, e.target.dataset.permissaoChave, e.target.checked);
-        });
-      });
-      container.appendChild(linha);
+      tr.addEventListener("click", () => abrirDetalhesPsicologo(p.id));
+      container.appendChild(tr);
     });
   }
+
+  // Modal "Detalhes do psicólogo" — mostra os dados e permite ajustar
+  // "Atende Primeira consulta", as permissões extra, e remover a conta.
+  let psicologoAtualId = null;
+
+  function abrirDetalhesPsicologo(id) {
+    const p = listaPsicologosParaAtribuir.find(x => x.id === id);
+    if (!p) return;
+    psicologoAtualId = id;
+
+    document.getElementById("dp-nome").textContent = p.nome || "-";
+    document.getElementById("dp-email").textContent = p.email || "(ainda não disponível — entra no painel para sincronizar)";
+    document.getElementById("dp-telefone").textContent = p.telefone || "-";
+    document.getElementById("dp-especialidade").textContent = p.especialidade || "-";
+    document.getElementById("dp-papel").textContent = p.role === "admin" ? "Administrador" : "Psicólogo";
+
+    const chkAtendePrimeira = document.getElementById("dp-atende-primeira");
+    chkAtendePrimeira.checked = !!p.atendePrimeiraConsulta;
+    chkAtendePrimeira.onchange = (e) => alternarAtendePrimeiraConsulta(p.id, e.target.checked);
+
+    const containerPermissoes = document.getElementById("dp-permissoes");
+    containerPermissoes.innerHTML = p.role === "admin"
+      ? ""
+      : PERMISSOES_ATRIBUIVEIS.map(perm => `
+          <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+            <input type="checkbox" data-permissao-chave="${perm.chave}" ${p.permissoes[perm.chave] ? "checked" : ""}>
+            ${perm.label}
+          </label>
+        `).join("");
+    containerPermissoes.querySelectorAll("input[data-permissao-chave]").forEach(input => {
+      input.addEventListener("change", (e) => {
+        alternarPermissao(p.id, e.target.dataset.permissaoChave, e.target.checked);
+      });
+    });
+
+    document.getElementById("modal-fundo-psicologo").classList.add("ativo");
+  }
+
+  document.getElementById("btn-fechar-modal-psicologo").addEventListener("click", () => {
+    document.getElementById("modal-fundo-psicologo").classList.remove("ativo");
+  });
+
+  document.getElementById("btn-remover-psicologo-modal").addEventListener("click", async () => {
+    if (!psicologoAtualId) return;
+    const p = listaPsicologosParaAtribuir.find(x => x.id === psicologoAtualId);
+    await removerPsicologo(psicologoAtualId, p ? p.nome : "");
+    document.getElementById("modal-fundo-psicologo").classList.remove("ativo");
+  });
 
   async function alternarAtendePrimeiraConsulta(id, valor) {
     try {
