@@ -743,6 +743,8 @@
           id: docSnap.id,
           nome: docSnap.data().nome || "Sem nome",
           role: docSnap.data().role || "psicologo",
+          email: docSnap.data().email || "",
+          telefone: docSnap.data().telefone || "",
           atendePrimeiraConsulta: !!docSnap.data().atendePrimeiraConsulta,
           permissoes: docSnap.data().permissoes || {},
         });
@@ -787,9 +789,12 @@
           `).join("");
 
       linha.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px;">
           <span>${escapeHtml(p.nome)} ${p.role === "admin" ? "<b style='color:var(--forest);'>(admin)</b>" : ""}</span>
           <button data-id="${p.id}" style="background:none; border:none; color:#b3452c; cursor:pointer; font-size:0.8rem;">Remover</button>
+        </div>
+        <div style="font-size:0.78rem; color:#666; margin-bottom:8px;">
+          ${escapeHtml(p.email) || "<em>email ainda não disponível (entra no painel para sincronizar)</em>"}${p.telefone ? " · " + escapeHtml(p.telefone) : ""}
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:6px 14px;">
           <label style="display:flex; align-items:center; gap:5px; font-size:0.76rem; cursor:pointer;">
