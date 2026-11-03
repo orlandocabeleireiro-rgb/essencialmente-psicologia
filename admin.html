@@ -103,7 +103,7 @@
 
   <div id="admin-tabs">
     <button class="admin-tab-btn" data-aba="agenda">Agenda</button>
-    <button class="admin-tab-btn" data-aba="consultas">Consultas</button>
+    <button class="admin-tab-btn" data-aba="consultas">Consultas<span class="aviso-badge" id="badge-consultas"></span></button>
     <button class="admin-tab-btn so-admin" data-aba="espera">Lista de espera<span class="aviso-badge" id="badge-espera"></span></button>
     <button class="admin-tab-btn so-admin" data-aba="triagem">Triagem<span class="aviso-badge" id="badge-triagem"></span></button>
     <button class="admin-tab-btn so-admin" data-aba="psicologos">Psicólogos</button>
@@ -743,6 +743,8 @@
           id: docSnap.id,
           nome: docSnap.data().nome || "Sem nome",
           role: docSnap.data().role || "psicologo",
+          email: docSnap.data().email || "",
+          telefone: docSnap.data().telefone || "",
           atendePrimeiraConsulta: !!docSnap.data().atendePrimeiraConsulta,
           permissoes: docSnap.data().permissoes || {},
         });
@@ -787,9 +789,12 @@
           `).join("");
 
       linha.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px;">
           <span>${escapeHtml(p.nome)} ${p.role === "admin" ? "<b style='color:var(--forest);'>(admin)</b>" : ""}</span>
           <button data-id="${p.id}" style="background:none; border:none; color:#b3452c; cursor:pointer; font-size:0.8rem;">Remover</button>
+        </div>
+        <div style="font-size:0.78rem; color:#666; margin-bottom:8px;">
+          ${escapeHtml(p.email) || "<em>email ainda não disponível (entra no painel para sincronizar)</em>"}${p.telefone ? " · " + escapeHtml(p.telefone) : ""}
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:6px 14px;">
           <label style="display:flex; align-items:center; gap:5px; font-size:0.76rem; cursor:pointer;">
@@ -964,6 +969,17 @@
   function atualizarBadgeEspera(count) {
     const badge = document.getElementById("badge-espera");
     if (!badge) return;
+    badge.textContent = count;
+    badge.style.display = count > 0 ? "block" : "none";
+  }
+
+  // Selo na própria aba "Consultas" com o nº de marcações ainda não vistas
+  // (recalculado a partir da cache, sempre que ela muda).
+  function atualizarBadgeConsultas() {
+    const badge = document.getElementById("badge-consultas");
+    if (!badge) return;
+    const count = Object.values(window.consultasCache || {})
+      .filter(c => !c.visualizada && c.estado !== "cancelada").length;
     badge.textContent = count;
     badge.style.display = count > 0 ? "block" : "none";
   }
@@ -2024,6 +2040,7 @@
       }
 
       renderProximasConsultas(todasConsultas);
+      atualizarBadgeConsultas();
 
       let algumaLinha = false;
       todasConsultas.forEach(({ id, c }) => {
@@ -2179,6 +2196,7 @@
         window.consultasCache[id] = c;
         const linha = document.querySelector(`tr[data-id="${id}"] .badge-novo`);
         if (linha) linha.remove();
+        atualizarBadgeConsultas();
       } catch (err) {
         console.error("Erro ao marcar como visualizada:", err);
       }
